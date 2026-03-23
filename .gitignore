@@ -26,6 +26,10 @@ build/
 !**/docker-compose.example.env
 server/.env
 deploy/https.env
+# 阿里云等签发的 TLS 私钥与链（勿提交）
+deploy/certs/*.pem
+deploy/certs/*.key
+deploy/certs/*.crt
 
 # --- 本地数据库 / 数据文件 ---
 *.db
