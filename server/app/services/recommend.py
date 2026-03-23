@@ -7,6 +7,7 @@ from app.catalog.presets import user_subscription_keywords_csv
 from app.config import settings
 from app.models import Paper, UserProfile
 from app.schemas import PaperOut, RankTag
+from app.services.text_plain import strip_html_to_plain
 from app.services.tokenize import interest_match_score
 
 
@@ -57,11 +58,12 @@ def paper_to_out(
     rank_tags: list[RankTag] | None = None,
     feed_blurb: str = "",
 ) -> PaperOut:
+    abst = strip_html_to_plain(p.abstract)
     return PaperOut(
         id=p.id,
         external_id=p.external_id,
         title=p.title,
-        abstract=p.abstract,
+        abstract=abst,
         authors_text=(p.authors_text or "").strip(),
         pdf_url=p.pdf_url,
         html_url=p.html_url,
@@ -92,7 +94,8 @@ def papers_to_feed_items(
     for p in papers:
         h = p.stats.hot_score if p.stats is not None else 0.0
         hot_raw.append(h)
-        ir = interest_match_score(blobs, p.title, p.abstract) + _keyword_bonus(kws, p.title, p.abstract)
+        abst_plain = strip_html_to_plain(p.abstract)
+        ir = interest_match_score(blobs, p.title, abst_plain) + _keyword_bonus(kws, p.title, abst_plain)
         interest_raw.append(ir)
         recency_raw.append(_recency(p, now))
 

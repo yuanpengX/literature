@@ -1,5 +1,6 @@
 package com.literatureradar.app.ui.feed
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -177,10 +178,21 @@ fun FeedScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            Column(Modifier.fillMaxWidth()) {
-                TopAppBar(
-                    title = { Text("推荐", style = MaterialTheme.typography.titleLarge) },
-                )
+            TopAppBar(
+                title = { Text("推荐", style = MaterialTheme.typography.titleLarge) },
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface),
+            ) {
                 TabRow(selectedTabIndex = selectedChannel.ordinal) {
                     FeedChannel.entries.forEach { ch ->
                         Tab(
@@ -200,29 +212,27 @@ fun FeedScreen(
                     }
                 }
             }
-        },
-    ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = {
-                scope.launch {
-                    refreshing = true
-                    error = null
-                    runCatching { ServiceLocator.api.requestSubscriptionFetch() }
-                    runCatching { refreshFirstPage() }
-                        .onFailure { error = it.message }
-                    refreshing = false
-                }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = {
+                    scope.launch {
+                        refreshing = true
+                        error = null
+                        runCatching { ServiceLocator.api.requestSubscriptionFetch() }
+                        runCatching { refreshFirstPage() }
+                            .onFailure { error = it.message }
+                        refreshing = false
+                    }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
             ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                 when {
                     loading && items.isEmpty() -> {
                         item(key = "loading") {
@@ -324,6 +334,7 @@ fun FeedScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }

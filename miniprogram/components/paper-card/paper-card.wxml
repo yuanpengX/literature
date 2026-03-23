@@ -9,5 +9,5 @@
   <text class="title">{{paper.title}}</text>
   <text wx:if="{{paper.authors_text}}" class="authors">{{paper.authors_text}}</text>
   <view wx:if="{{summaryLine}}" class="pick-blurb">{{summaryLine}}</view>
-  <text class="abstract">{{paper.abstract}}</text>
+  <text class="abstract">{{abstractPlain}}</text>
 </view>

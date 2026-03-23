@@ -18,6 +18,7 @@ from app.config import settings
 from app.models import Paper, UserProfile
 from app.database import SessionLocal
 from app.services.author_format import format_author_line
+from app.services.text_plain import strip_html_to_plain
 from app.services.openalex import (
     enrich_arxiv_citations,
     fetch_and_upsert_openalex,
@@ -141,8 +142,8 @@ def fetch_and_upsert_rss(db: Session, feed_url: str) -> int:
         if not link:
             continue
         ext_id = f"rss:{hashlib.md5(link.encode()).hexdigest()}"
-        title = (entry.get("title") or "").strip()
-        summary = (entry.get("summary") or entry.get("description") or "").strip()
+        title = strip_html_to_plain(entry.get("title") or "")
+        summary = strip_html_to_plain(entry.get("summary") or entry.get("description") or "")
         published = _parse_rss_date(entry)
         source = f"rss:{urlparse(feed_url).netloc or 'feed'}"
         rss_authors: list[str] = []

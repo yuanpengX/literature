@@ -11,7 +11,7 @@
       <text class="sub">{{paper.source}} · {{paper.external_id}}</text>
       <text wx:if="{{paper.citation_count > 0}}" class="cite">引用（OpenAlex）{{paper.citation_count}}</text>
       <text class="sec-title">摘要</text>
-      <text class="body">{{paper.abstract}}</text>
+      <text class="body">{{abstractPlain}}</text>
 
       <text class="sec-title">AI 要点（端上模型）</text>
       <text class="hint">内容由大模型根据摘要生成；请在设置中配置自备 API Key 与合法域名。</text>

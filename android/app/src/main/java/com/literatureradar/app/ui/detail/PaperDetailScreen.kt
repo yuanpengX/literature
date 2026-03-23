@@ -40,6 +40,7 @@ import com.literatureradar.app.ServiceLocator
 import com.literatureradar.app.data.AnalyticsEventJson
 import com.literatureradar.app.data.PaperJson
 import com.literatureradar.app.data.local.FavoriteEntity
+import com.literatureradar.app.data.stripHtmlToPlain
 import com.literatureradar.app.data.toEntity
 import com.literatureradar.app.data.toPaperJson
 import kotlinx.coroutines.Dispatchers
@@ -184,7 +185,7 @@ fun PaperDetailScreen(
                         )
                     }
                     Text("摘要", style = MaterialTheme.typography.titleMedium)
-                    Text(p.abstract, style = MaterialTheme.typography.bodyLarge)
+                    Text(p.abstract.stripHtmlToPlain(), style = MaterialTheme.typography.bodyLarge)
 
                     Text("AI 要点（端上模型）", style = MaterialTheme.typography.titleMedium)
                     Text(
@@ -203,7 +204,7 @@ fun PaperDetailScreen(
                             aiLoading = true
                             scope.launch {
                                 val r = withContext(Dispatchers.IO) {
-                                    llm.summarizePaperChinese(p.title, p.abstract)
+                                    llm.summarizePaperChinese(p.title, p.abstract.stripHtmlToPlain())
                                 }
                                 aiLoading = false
                                 r.onSuccess { aiSummary = it }

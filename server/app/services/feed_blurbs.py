@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Paper, PaperUserBlurb, UserProfile
+from app.services.text_plain import heuristic_feed_blurb_from_abstract, strip_html_to_plain
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def _call_llm_blurbs(
         return {}
     lines = ["请为下列论文各写一句中文内容总结（不超过80字），基于标题与摘要，不要编造。", ""]
     for p in papers:
-        abst = (p.abstract or "").replace("\n", " ")[:400]
+        abst = strip_html_to_plain(p.abstract).replace("\n", " ")[:400]
         lines.append(f"id={p.id} | {p.title}")
         lines.append(f"摘要：{abst}")
         lines.append("")
@@ -117,7 +118,9 @@ def merge_blurbs_into_feed_items(
     ids = [it.id for it in items]
     m = load_blurbs_for_papers(db, user_id, ids)
     for i, it in enumerate(items):
-        b = m.get(it.id, "")
+        b = (m.get(it.id, "") or "").strip()
+        if not b:
+            b = heuristic_feed_blurb_from_abstract(it.abstract)
         items[i] = it.model_copy(update={"feed_blurb": b})
 
 

@@ -3,6 +3,14 @@
   padding-bottom: 24rpx;
 }
 
+/* 页面滚动时频道/排序栏吸顶 */
+.tab-bar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fffbfe;
+}
+
 .tabs {
   display: flex;
   background: #FFFBFE;

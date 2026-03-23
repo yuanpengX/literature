@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.catalog.presets import CONFERENCE_PRESETS, JOURNAL_PRESETS, user_subscription_keywords_list
 from app.models import Paper, UserProfile
 from app.services.recommend import load_candidate_papers
+from app.services.text_plain import strip_html_to_plain
 
 
 def merge_subscription_candidate_papers(
@@ -121,7 +122,7 @@ def user_has_enabled_subscription(user: UserProfile) -> bool:
 def _keyword_hit(p: Paper, keywords: list[str]) -> bool:
     if not keywords:
         return False
-    blob = f"{p.title} {p.abstract}".lower()
+    blob = f"{p.title} {strip_html_to_plain(p.abstract)}".lower()
     return any(k.lower() in blob for k in keywords)
 
 

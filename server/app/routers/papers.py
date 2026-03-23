@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.deps import get_db
 from app.models import Paper
 from app.schemas import PaperOut
+from app.services.text_plain import strip_html_to_plain
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -20,7 +21,7 @@ def get_paper(paper_id: int, db: Session = Depends(get_db)):
         id=p.id,
         external_id=p.external_id,
         title=p.title,
-        abstract=p.abstract,
+        abstract=strip_html_to_plain(p.abstract),
         authors_text=(p.authors_text or "").strip(),
         pdf_url=p.pdf_url,
         html_url=p.html_url,

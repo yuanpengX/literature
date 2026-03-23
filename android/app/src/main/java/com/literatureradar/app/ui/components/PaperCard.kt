@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.data.PaperJson
+import com.literatureradar.app.data.stripHtmlToPlain
 
 @Composable
 fun PaperCard(
@@ -116,7 +117,7 @@ fun PaperCard(
                 }
             }
             Text(
-                text = paper.abstract,
+                text = paper.abstract.stripHtmlToPlain(),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,

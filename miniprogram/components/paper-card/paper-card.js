@@ -1,3 +1,5 @@
+const { stripHtmlToPlain } = require('../../utils/textPlain.js')
+
 function buildTagChips(p) {
   const tags = (p && p.rank_tags) || []
   const out = []
@@ -29,6 +31,7 @@ Component({
   data: {
     tagChips: [],
     summaryLine: '',
+    abstractPlain: '',
   },
   observers: {
     paper(p) {
@@ -38,6 +41,7 @@ Component({
       this.setData({
         tagChips: buildTagChips(p),
         summaryLine: summary,
+        abstractPlain: stripHtmlToPlain((p && p.abstract) || ''),
       })
     },
     pickBlurb(pick) {

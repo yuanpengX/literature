@@ -21,6 +21,7 @@ from app.services.subscription_candidates import (
     filter_papers_by_user_subscriptions,
     merge_subscription_candidate_papers,
 )
+from app.services.text_plain import strip_html_to_plain
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def _build_user_prompt(keywords_csv: str, papers: list[Paper]) -> str:
     ]
     lim = max(200, settings.daily_picks_abstract_chars)
     for p in papers:
-        abst = (p.abstract or "").replace("\n", " ").strip()[:lim]
+        abst = strip_html_to_plain(p.abstract).replace("\n", " ").strip()[:lim]
         ch = p.source or "?"
         au = (p.authors_text or "").strip()
         if au:

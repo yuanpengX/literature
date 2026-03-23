@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const { stripHtmlToPlain } = require('../../utils/textPlain.js')
 const fav = require('../../utils/favorites.js')
 const llm = require('../../utils/llm.js')
 
@@ -12,6 +13,7 @@ Page({
     aiSummary: '',
     aiLoading: false,
     aiError: '',
+    abstractPlain: '',
   },
 
   onLoad(options) {
@@ -30,6 +32,7 @@ Page({
       const p = await api.getPaper(id)
       this.setData({
         paper: p,
+        abstractPlain: stripHtmlToPlain((p && p.abstract) || ''),
         loading: false,
         isFavorite: fav.isFavorite(id),
       })
@@ -50,7 +53,7 @@ Page({
     const p = this.data.paper
     if (!p) return
     this.setData({ aiLoading: true, aiError: '' })
-    llm.summarizePaperChinese(p.title, p.abstract, (err, text) => {
+    llm.summarizePaperChinese(p.title, stripHtmlToPlain(p.abstract || ''), (err, text) => {
       this.setData({
         aiLoading: false,
         aiError: err ? err.message || String(err) : '',

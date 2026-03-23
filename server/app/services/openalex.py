@@ -200,23 +200,43 @@ def fetch_and_upsert_openalex(db: Session) -> int:
 
 
 def fetch_and_upsert_openalex_conference_works(db: Session) -> int:
-    """按「来源类型为会议」拉一批论文，填充「会议」频道（需开启 OpenAlex）。"""
+    """按「来源类型为会议 / proceedings」拉一批论文，填充「会议」频道（需开启 OpenAlex）。"""
     if not settings.openalex_enabled or not settings.openalex_fetch_conference_works:
         return 0
     d = date.today() - timedelta(days=settings.openalex_lookback_days)
-    filt = ",".join(
-        [
-            "type:article",
-            f"from_publication_date:{d.isoformat()}",
-            "is_paratext:false",
-            "primary_location.source.type:conference",
-        ]
+    base = [
+        "type:article",
+        f"from_publication_date:{d.isoformat()}",
+        "is_paratext:false",
+    ]
+    # OpenAlex 中部分 proceedings 的 source.type 为 proceedings 而非 conference，分两路拉取并去重
+    type_filters = (
+        "primary_location.source.type:conference",
+        "primary_location.source.type:proceedings",
     )
+    seen_wid: set[str] = set()
+    merged: list = []
+    for tf in type_filters:
+        filt = ",".join([*base, tf])
+        try:
+            chunk = _openalex_fetch_results(filt)
+        except Exception:
+            logger.warning("openalex conference batch failed filter=%s", tf, exc_info=True)
+            continue
+        for w in chunk:
+            if not isinstance(w, dict):
+                continue
+            wid = _openalex_short_id(str(w.get("id") or ""))
+            if not wid or wid in seen_wid:
+                continue
+            seen_wid.add(wid)
+            merged.append(w)
+    if not merged:
+        return 0
     try:
-        results = _openalex_fetch_results(filt)
-        return _upsert_openalex_works_batch(db, results)
+        return _upsert_openalex_works_batch(db, merged)
     except Exception:
-        logger.warning("openalex conference batch failed (filter may be unsupported)", exc_info=True)
+        logger.warning("openalex conference upsert failed", exc_info=True)
         return 0
 
 
