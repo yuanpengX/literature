@@ -90,7 +90,7 @@ cp .env.example .env
 
 主要 API：
 
-- `GET /api/v1/feed?sort=recommended|recent`
+- `GET /api/v1/feed?sort=recommended|recent|hot|for_you`（Android / 小程序客户端当前固定使用 `recommended`）
 - `GET /api/v1/search?q=...`
 - `POST /api/v1/events`
 - `PUT /api/v1/users/me/preferences`
