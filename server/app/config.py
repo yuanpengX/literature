@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     recommend_alpha_hot: float = 0.45
     recommend_beta_interest: float = 0.45
     recommend_gamma_recency: float = 0.10
+    # 每日精选（用户需主动同步 LLM 密钥到服务端；建议仅自建可信实例开启）
+    daily_picks_hour: int = 6
+    daily_picks_minute: int = 30
+    daily_picks_timezone: str = "Asia/Shanghai"
+    daily_picks_max_candidates: int = 48
+    daily_picks_abstract_chars: int = 600
 
 
 settings = Settings()

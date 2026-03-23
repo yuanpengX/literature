@@ -4,14 +4,25 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import Base, SessionLocal, engine, ensure_papers_schema
+from app.database import (
+    Base,
+    SessionLocal,
+    engine,
+    ensure_papers_schema,
+    ensure_user_llm_columns,
+    ensure_user_subscription_columns,
+)
 import app.models  # noqa: F401 — 注册全部 ORM，供 create_all 建 fcm_tokens 等表
-from app.routers import devices, events, feed, papers, prefs, search
+from app.routers import daily_picks, devices, events, feed, papers, prefs, search, subscriptions
+from app.services.daily_picks import run_daily_picks_for_all_users
 from app.services.ingest import run_all_ingestion
 from app.services.jobs import purge_old_events, purge_old_papers
+from app.config import settings
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=2)
@@ -25,6 +36,17 @@ def _ingest_job() -> None:
         logger.info("ingestion %s", out)
     except Exception:
         logger.exception("ingestion failed")
+    finally:
+        db.close()
+
+
+def _daily_picks_job() -> None:
+    db = SessionLocal()
+    try:
+        n = run_daily_picks_for_all_users(db)
+        logger.info("daily_picks finished users_touched=%s", n)
+    except Exception:
+        logger.exception("daily_picks job failed")
     finally:
         db.close()
 
@@ -46,12 +68,28 @@ async def lifespan(app: FastAPI):
     global _scheduler
     Base.metadata.create_all(bind=engine)
     ensure_papers_schema(engine)
+    ensure_user_llm_columns(engine)
+    ensure_user_subscription_columns(engine)
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(_executor, _ingest_job)
 
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(_ingest_job, "interval", hours=2, id="ingest", replace_existing=True)
     _scheduler.add_job(_purge_job, "cron", hour=3, minute=10, id="purge", replace_existing=True)
+    try:
+        tz = ZoneInfo(settings.daily_picks_timezone)
+    except Exception:
+        tz = ZoneInfo("Asia/Shanghai")
+    _scheduler.add_job(
+        _daily_picks_job,
+        CronTrigger(
+            hour=settings.daily_picks_hour,
+            minute=settings.daily_picks_minute,
+            timezone=tz,
+        ),
+        id="daily_picks",
+        replace_existing=True,
+    )
     _scheduler.start()
 
     yield
@@ -77,6 +115,8 @@ app.include_router(papers.router, prefix=api_prefix)
 app.include_router(search.router, prefix=api_prefix)
 app.include_router(events.router, prefix=api_prefix)
 app.include_router(prefs.router, prefix=api_prefix)
+app.include_router(subscriptions.router, prefix=api_prefix)
+app.include_router(daily_picks.router, prefix=api_prefix)
 app.include_router(devices.router, prefix=api_prefix)
 
 

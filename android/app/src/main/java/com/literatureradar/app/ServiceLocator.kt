@@ -65,7 +65,8 @@ object ServiceLocator {
         if (!::appContext.isInitialized) return
         val defaultBase = appContext.getString(R.string.api_base_url)
         val fromPrefs = AppPrefs.getApiBaseUrl(appContext).trim()
-        val base = (fromPrefs.ifBlank { defaultBase }).trimEnd('/') + "/"
+        val raw = (fromPrefs.ifBlank { defaultBase }).trim()
+        val base = AppPrefs.normalizeApiBaseUrl(raw).trimEnd('/') + "/"
         val cur = network
         if (cur != null && cur.baseUrl == base) return
 

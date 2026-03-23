@@ -2,6 +2,7 @@ package com.literatureradar.app
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -13,6 +14,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -22,18 +26,22 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.literatureradar.app.ui.about.AboutScreen
+import com.literatureradar.app.ui.dailypicks.DailyPicksScreen
 import com.literatureradar.app.ui.detail.PaperDetailScreen
 import com.literatureradar.app.ui.feed.FeedScreen
 import com.literatureradar.app.ui.saved.SavedScreen
 import com.literatureradar.app.ui.search.SearchScreen
 import com.literatureradar.app.ui.settings.SettingsScreen
+import com.literatureradar.app.ui.settings.SubscriptionConfigScreen
 
 private object Routes {
     const val Feed = "feed"
+    const val DailyPicks = "daily_picks"
     const val Search = "search"
     const val Saved = "saved"
     const val Settings = "settings"
     const val About = "about"
+    const val Subscriptions = "subscriptions"
     const val Paper = "paper/{id}"
     fun paper(id: Int) = "paper/$id"
 }
@@ -41,9 +49,11 @@ private object Routes {
 @Composable
 fun LiteratureAppRoot() {
     val nav = rememberNavController()
+    var feedReselectSignal by remember { mutableIntStateOf(0) }
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
     val showBottomBar = current == Routes.Feed ||
+        current == Routes.DailyPicks ||
         current == Routes.Search ||
         current == Routes.Saved ||
         current == Routes.Settings
@@ -55,14 +65,30 @@ fun LiteratureAppRoot() {
                     NavigationBarItem(
                         selected = current == Routes.Feed,
                         onClick = {
-                            nav.navigate(Routes.Feed) {
+                            if (current == Routes.Feed) {
+                                feedReselectSignal++
+                            } else {
+                                nav.navigate(Routes.Feed) {
+                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                        label = { Text("推荐") },
+                    )
+                    NavigationBarItem(
+                        selected = current == Routes.DailyPicks,
+                        onClick = {
+                            nav.navigate(Routes.DailyPicks) {
                                 popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                        label = { Text("推荐") },
+                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                        label = { Text("精选") },
                     )
                     NavigationBarItem(
                         selected = current == Routes.Search,
@@ -110,7 +136,13 @@ fun LiteratureAppRoot() {
             modifier = Modifier.padding(padding),
         ) {
             composable(Routes.Feed) {
-                FeedScreen(onOpenPaper = { id -> nav.navigate(Routes.paper(id)) })
+                FeedScreen(
+                    onOpenPaper = { id -> nav.navigate(Routes.paper(id)) },
+                    tabReselectSignal = feedReselectSignal,
+                )
+            }
+            composable(Routes.DailyPicks) {
+                DailyPicksScreen(onOpenPaper = { id -> nav.navigate(Routes.paper(id)) })
             }
             composable(Routes.Search) {
                 SearchScreen(onOpenPaper = { id -> nav.navigate(Routes.paper(id)) })
@@ -119,7 +151,13 @@ fun LiteratureAppRoot() {
                 SavedScreen(onOpenPaper = { id -> nav.navigate(Routes.paper(id)) })
             }
             composable(Routes.Settings) {
-                SettingsScreen(onOpenAbout = { nav.navigate(Routes.About) })
+                SettingsScreen(
+                    onOpenAbout = { nav.navigate(Routes.About) },
+                    onOpenSubscriptionConfig = { nav.navigate(Routes.Subscriptions) },
+                )
+            }
+            composable(Routes.Subscriptions) {
+                SubscriptionConfigScreen(onBack = { nav.popBackStack() })
             }
             composable(Routes.About) {
                 AboutScreen(onBack = { nav.popBackStack() })

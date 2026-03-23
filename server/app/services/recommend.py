@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
@@ -107,13 +107,41 @@ def papers_to_feed_items(
     return out
 
 
-def load_candidate_papers(db: Session, limit: int = 500) -> list[Paper]:
+def load_candidate_papers(
+    db: Session,
+    limit: int = 500,
+    channel: str | None = None,
+) -> list[Paper]:
+    """
+    channel:
+      None — 全部（兼容旧客户端、本地摘要等）
+      arxiv — 仅 arXiv
+      journal — 期刊/综合：OpenAlex（含未细分）、RSS 订阅
+      conference — OpenAlex 标记为会议的文献
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.paper_ttl_days)
     stmt = (
         select(Paper)
         .options(joinedload(Paper.stats))
         .where(Paper.ingested_at >= cutoff)
-        .order_by(Paper.published_at.desc().nulls_last(), Paper.id.desc())
-        .limit(limit)
     )
+    ch = (channel or "").strip().lower()
+    if ch == "arxiv":
+        stmt = stmt.where(Paper.source == "arxiv")
+    elif ch == "journal":
+        stmt = stmt.where(
+            Paper.source != "arxiv",
+            or_(
+                Paper.source == "openalex",
+                Paper.source.like("openalex:journal%"),
+                Paper.source.like("rss:%"),
+            ),
+        )
+    elif ch == "conference":
+        stmt = stmt.where(
+            Paper.source != "arxiv",
+            Paper.source.like("openalex:conference%"),
+        )
+
+    stmt = stmt.order_by(Paper.published_at.desc().nulls_last(), Paper.id.desc()).limit(limit)
     return list(db.scalars(stmt).unique().all())

@@ -51,9 +51,13 @@ cd "$ANDROID_DIR"
 chmod +x ./gradlew
 ./gradlew --no-daemon assembleRelease
 
+# Gradle 会将 APK 同步到 android/apk/（浅路径）；否则回退默认输出目录
+SHALLOW_DIR="$ANDROID_DIR/apk"
 REL_DIR="$ANDROID_DIR/app/build/outputs/apk/release"
 APK=""
-[[ -f "$REL_DIR/app-release.apk" ]] && APK="$REL_DIR/app-release.apk"
+[[ -f "$SHALLOW_DIR/app-release.apk" ]] && APK="$SHALLOW_DIR/app-release.apk"
+[[ -z "$APK" && -f "$SHALLOW_DIR/app-release-unsigned.apk" ]] && APK="$SHALLOW_DIR/app-release-unsigned.apk"
+[[ -z "$APK" && -f "$REL_DIR/app-release.apk" ]] && APK="$REL_DIR/app-release.apk"
 [[ -z "$APK" && -f "$REL_DIR/app-release-unsigned.apk" ]] && APK="$REL_DIR/app-release-unsigned.apk"
 if [[ -n "$APK" ]]; then
   echo "APK: $APK"

@@ -72,6 +72,11 @@ class LlmSecureStore(context: Context) {
         return "$base/chat/completions"
     }
 
+    /** 同步到服务端每日精选用：含 `/v1` 的根，不含 `/chat/completions`。 */
+    fun resolvedOpenAiBaseRoot(): String {
+        return resolvedChatCompletionsUrl().removeSuffix("/chat/completions").trimEnd('/')
+    }
+
     companion object {
         private const val KEY_PROVIDER = "provider_id"
         private const val KEY_MODEL = "model"

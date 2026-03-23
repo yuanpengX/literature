@@ -106,6 +106,13 @@ def fetch_and_upsert_openalex(db: Session) -> int:
         src = pl.get("source") or {}
         venue = (src.get("display_name") or pl.get("raw_source_name") or "") or None
         primary = (venue[:128] if venue else None)
+        src_type = str(src.get("type") or "").lower().replace(" ", "")
+        if src_type == "journal":
+            paper_source = "openalex:journal"
+        elif src_type in ("conference", "proceedings", "conferenceproceedings"):
+            paper_source = "openalex:conference"
+        else:
+            paper_source = "openalex"
 
         existing = db.execute(select(Paper).where(Paper.external_id == ext_id)).scalar_one_or_none()
         if existing:
@@ -114,6 +121,7 @@ def fetch_and_upsert_openalex(db: Session) -> int:
             existing.pdf_url = pdf_url
             existing.html_url = html_url
             existing.primary_category = primary
+            existing.source = paper_source
             existing.citation_count = cited
             if published:
                 existing.published_at = published
@@ -125,7 +133,7 @@ def fetch_and_upsert_openalex(db: Session) -> int:
                     abstract=abstract,
                     pdf_url=pdf_url,
                     html_url=html_url,
-                    source="openalex",
+                    source=paper_source,
                     primary_category=primary,
                     published_at=published,
                     citation_count=cited,

@@ -46,10 +46,77 @@ data class PreferencesOkJson(
 )
 
 @Serializable
+data class UserLlmCredentialsBody(
+    @SerialName("base_url") val baseUrl: String,
+    @SerialName("api_key") val apiKey: String,
+    val model: String,
+)
+
+@Serializable
+data class DailyPicksResponseJson(
+    val date: String,
+    val items: List<PaperJson> = emptyList(),
+    val note: String? = null,
+    val error: String? = null,
+    @SerialName("server_llm_configured") val serverLlmConfigured: Boolean = false,
+)
+
+@Serializable
 data class AnalyticsEventJson(
     @SerialName("event_type") val eventType: String,
     @SerialName("paper_id") val paperId: Int? = null,
     val surface: String? = null,
     val position: Int? = null,
     val payload: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class SubscriptionKeywordItemJson(
+    val text: String,
+    val enabled: Boolean = true,
+)
+
+@Serializable
+data class SubscriptionJournalItemJson(
+    val id: String,
+    val enabled: Boolean = true,
+)
+
+@Serializable
+data class SubscriptionConferenceItemJson(
+    val id: String,
+    val enabled: Boolean = true,
+)
+
+@Serializable
+data class JournalPresetJson(
+    val id: String,
+    val name: String,
+    val abbr: String,
+    val issn: String,
+    val rss: String? = null,
+)
+
+@Serializable
+data class ConferencePresetJson(
+    val id: String,
+    val name: String,
+    val abbr: String,
+    val note: String? = null,
+)
+
+@Serializable
+data class SubscriptionCatalogJson(
+    val journals: List<JournalPresetJson> = emptyList(),
+    val conferences: List<ConferencePresetJson> = emptyList(),
+    @SerialName("default_keywords") val defaultKeywords: List<SubscriptionKeywordItemJson> = emptyList(),
+    @SerialName("default_journals") val defaultJournals: List<SubscriptionJournalItemJson> = emptyList(),
+    @SerialName("default_conferences") val defaultConferences: List<SubscriptionConferenceItemJson> = emptyList(),
+)
+
+@Serializable
+data class UserSubscriptionsJson(
+    val keywords: List<SubscriptionKeywordItemJson> = emptyList(),
+    val journals: List<SubscriptionJournalItemJson> = emptyList(),
+    val conferences: List<SubscriptionConferenceItemJson> = emptyList(),
 )

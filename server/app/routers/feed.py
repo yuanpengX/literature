@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.deps import current_user_id, get_db
@@ -18,6 +18,10 @@ def get_feed(
     cursor: str | None = Query(None, description="Offset string for pagination"),
     limit: int = Query(20, ge=1, le=100),
     sort: Literal["recommended", "recent"] = "recommended",
+    channel: str | None = Query(
+        None,
+        description="arxiv | journal | conference；不传则不分频道（全部）",
+    ),
 ):
     offset = 0
     if cursor:
@@ -26,8 +30,16 @@ def get_feed(
         except ValueError:
             offset = 0
 
+    raw = (channel or "").strip().lower()
+    if not raw:
+        ch = None
+    elif raw in ("arxiv", "journal", "conference"):
+        ch = raw
+    else:
+        raise HTTPException(status_code=400, detail="channel 须为 arxiv、journal 或 conference")
+
     user = db.get(UserProfile, user_id)
-    papers = load_candidate_papers(db, limit=800)
+    papers = load_candidate_papers(db, limit=800, channel=ch)
     ordered = papers_to_feed_items(papers, user, sort)
     page = ordered[offset : offset + limit]
     next_offset = offset + limit

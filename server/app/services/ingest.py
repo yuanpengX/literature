@@ -7,11 +7,14 @@ from urllib.parse import urlparse
 
 import feedparser
 import httpx
+import json
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.catalog.presets import JOURNAL_PRESETS
 from app.config import settings
-from app.models import Paper
+from app.models import Paper, UserProfile
 from app.services.openalex import enrich_arxiv_citations, fetch_and_upsert_openalex
 
 
@@ -149,6 +152,32 @@ def fetch_and_upsert_rss(db: Session, feed_url: str) -> int:
     return count
 
 
+def collect_subscription_rss_urls(db: Session) -> list[str]:
+    """合并所有用户已启用期刊预设对应的 RSS，去重。"""
+    seen: set[str] = set()
+    out: list[str] = []
+    for row in db.scalars(select(UserProfile)):
+        try:
+            arr = json.loads(row.subscription_journals_json or "[]")
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(arr, list):
+            continue
+        for item in arr:
+            if not isinstance(item, dict) or not item.get("enabled", True):
+                continue
+            jid = item.get("id")
+            if not jid or not isinstance(jid, str):
+                continue
+            preset = JOURNAL_PRESETS.get(jid)
+            if not preset or not preset.rss:
+                continue
+            if preset.rss not in seen:
+                seen.add(preset.rss)
+                out.append(preset.rss)
+    return out
+
+
 def run_all_ingestion(db: Session) -> dict[str, int]:
     out: dict[str, int] = {"arxiv_new": fetch_and_upsert_arxiv(db)}
     for raw in settings.rss_feeds.split(","):
@@ -156,6 +185,9 @@ def run_all_ingestion(db: Session) -> dict[str, int]:
         if u:
             key = f"rss_new:{u[:30]}"
             out[key] = fetch_and_upsert_rss(db, u)
+    for sub_url in collect_subscription_rss_urls(db):
+        key = f"rss_sub:{sub_url[:40]}"
+        out[key] = fetch_and_upsert_rss(db, sub_url)
     out["openalex_new"] = fetch_and_upsert_openalex(db)
     out["arxiv_citations_updated"] = enrich_arxiv_citations(db)
     return out

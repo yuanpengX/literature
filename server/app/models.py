@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -49,9 +49,33 @@ class UserProfile(Base):
 
     user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     keywords: Mapped[str] = mapped_column(Text, default="")  # comma-separated subscription prefs
+    subscription_keywords_json: Mapped[str] = mapped_column(Text, default="[]")
+    subscription_journals_json: Mapped[str] = mapped_column(Text, default="[]")
+    subscription_conferences_json: Mapped[str] = mapped_column(Text, default="[]")
     interest_blob: Mapped[str] = mapped_column(Text, default="{}")  # JSON: word -> weight
+    # 每日精选：用户自愿同步的 OpenAI 兼容端点（与客户端 BYOK 一致，须 HTTPS 自建可信）
+    llm_base_url: Mapped[str] = mapped_column(Text, default="")
+    llm_api_key: Mapped[str] = mapped_column(Text, default="")
+    llm_model: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class DailyPick(Base):
+    """按用户、按自然日缓存 LLM 选出的论文列表。"""
+
+    __tablename__ = "daily_picks"
+    __table_args__ = (UniqueConstraint("user_id", "pick_date", name="uq_daily_picks_user_date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(128), index=True)
+    pick_date: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD（与 daily_picks_timezone 一致）
+    paper_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    curator_note: Mapped[str] = mapped_column(Text, default="")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
     )
 
 

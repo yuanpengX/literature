@@ -1,9 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+}
+
+// 未配置正式 keystore 时，release 使用 debug 签名，避免打出「未签名」APK 导致安装提示损坏。
+// 正式上架：在 android/keystore.properties 配置 storeFile / 密码 / keyAlias（该文件已在 .gitignore）
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
 android {
@@ -18,6 +28,17 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile")!!)
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -25,6 +46,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig =
+                signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
@@ -47,6 +70,18 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+// release 完成后复制到 android/apk/，避免只在 app/build/outputs/apk/release/ 里找
+val syncReleaseApk = tasks.register<Copy>("syncReleaseApk") {
+    from(layout.buildDirectory.dir("outputs/apk/release"))
+    include("*.apk")
+    into(rootProject.layout.projectDirectory.dir("apk"))
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
+afterEvaluate {
+    tasks.named("assembleRelease") { finalizedBy(syncReleaseApk) }
 }
 
 dependencies {

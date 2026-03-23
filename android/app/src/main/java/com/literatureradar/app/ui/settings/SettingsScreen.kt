@@ -32,18 +32,20 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.R
 import com.literatureradar.app.ServiceLocator
-import com.literatureradar.app.data.PreferencesBody
+import com.literatureradar.app.data.UserLlmCredentialsBody
 import com.literatureradar.app.data.llm.LlmPresets
 import com.literatureradar.app.prefs.AppPrefs
 import com.literatureradar.app.work.DigestScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onOpenAbout: () -> Unit = {},
+    onOpenSubscriptionConfig: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val store = ServiceLocator.llmStore
@@ -52,7 +54,6 @@ fun SettingsScreen(
         ctx.getSharedPreferences("literature_prefs", android.content.Context.MODE_PRIVATE)
     }
 
-    var keywords by remember { mutableStateOf("") }
     var analyticsOn by remember { mutableStateOf(prefs.getBoolean("analytics_on", true)) }
     var digestOn by remember { mutableStateOf(AppPrefs.isLocalDigestEnabled(ctx)) }
 
@@ -70,8 +71,8 @@ fun SettingsScreen(
 
     var serverUrl by remember { mutableStateOf(AppPrefs.getApiBaseUrl(ctx)) }
     var backendHint by remember { mutableStateOf<String?>(null) }
-    var savedHint by remember { mutableStateOf<String?>(null) }
     var llmHint by remember { mutableStateOf<String?>(null) }
+    var dailyLlmHint by remember { mutableStateOf<String?>(null) }
     val scope = remember { CoroutineScope(Dispatchers.Main) }
 
     val preset = LlmPresets.byId(providerId)
@@ -94,7 +95,7 @@ fun SettingsScreen(
         ) {
             Text("文献服务器", style = MaterialTheme.typography.titleMedium)
             Text(
-                "填写 Docker / 本机 API 根地址，勿以 / 结尾。留空则使用默认（见占位）。修改后点「应用」。",
+                "填写服务根地址，例如 http://主机:8000；勿以 / 结尾，也不要带 /api/v1（接口路径里已含）。修改后点「应用」。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -114,10 +115,18 @@ fun SettingsScreen(
                         backendHint = "地址需以 http:// 或 https:// 开头"
                         return@Button
                     }
+                    val beforeNorm = u
                     AppPrefs.setApiBaseUrl(ctx, u)
+                    val norm = if (u.isBlank()) "" else AppPrefs.normalizeApiBaseUrl(u)
+                    serverUrl = norm
                     ServiceLocator.rebuildNetworkIfNeeded()
                     DigestScheduler.schedule(ctx)
-                    backendHint = "已应用后端地址"
+                    backendHint = when {
+                        beforeNorm.isNotBlank() &&
+                            beforeNorm.trimEnd('/').lowercase() != norm.lowercase() ->
+                            "已应用；已自动去掉末尾的 /api/v1 等重复路径"
+                        else -> "已应用后端地址"
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -223,28 +232,74 @@ fun SettingsScreen(
             }
             llmHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
 
-            Text("订阅偏好", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
-                value = keywords,
-                onValueChange = { keywords = it },
+            Text("订阅与抓取", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "在此集中管理订阅关键词、期刊（服务端按刊名匹配 RSS）与关注会议列表；保存后参与推荐、每日精选与定时抓取。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onOpenSubscriptionConfig,
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                placeholder = { Text("关键词，逗号分隔，同步到服务端") },
+            ) {
+                Text("打开订阅配置")
+            }
+
+            Text("每日精选（服务端 LLM）", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "服务器在设定时刻（默认每天 6:30，时区见服务端配置）用你的「订阅关键词」从 arXiv / 期刊 / 会议候选中筛文，并用你同步上来的 API Key 请求大模型选出约 10 篇。请勿在不信任的服务器上同步密钥。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(
                 onClick = {
                     scope.launch(Dispatchers.IO) {
-                        runCatching {
-                            ServiceLocator.api.putPreferences(PreferencesBody(keywords = keywords.trim()))
+                        val st = ServiceLocator.llmStore
+                        if (st.apiKey.isBlank()) {
+                            withContext(Dispatchers.Main) {
+                                dailyLlmHint = "请先在上方「大模型 BYOK」中填写 API Key"
+                            }
+                            return@launch
                         }
+                        runCatching {
+                            ServiceLocator.api.putLlmCredentials(
+                                UserLlmCredentialsBody(
+                                    baseUrl = st.resolvedOpenAiBaseRoot(),
+                                    apiKey = st.apiKey.trim(),
+                                    model = st.resolvedModel(),
+                                ),
+                            )
+                        }
+                            .onSuccess {
+                                withContext(Dispatchers.Main) {
+                                    dailyLlmHint = "已同步 LLM 到服务器（用于每日精选）"
+                                }
+                            }
+                            .onFailure { e ->
+                                withContext(Dispatchers.Main) {
+                                    dailyLlmHint = e.message ?: "同步失败"
+                                }
+                            }
                     }
-                    savedHint = "已尝试同步偏好（需网络）"
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("保存并同步关键词")
+                Text("同步 LLM 到服务器")
             }
-            savedHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            TextButton(
+                onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        runCatching { ServiceLocator.api.deleteLlmCredentials() }
+                        withContext(Dispatchers.Main) {
+                            dailyLlmHint = "已请求清除服务端 LLM（若曾同步过）"
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("清除服务端 LLM 配置")
+            }
+            dailyLlmHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
 
             Text("新论文提醒（本地）", style = MaterialTheme.typography.titleMedium)
             Text(
