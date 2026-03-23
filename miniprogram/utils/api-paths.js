@@ -1,6 +1,6 @@
 /**
  * 文献后端 /api/v1 路径（与 Android ApiV1Paths.kt、FastAPI routers 一致）。
- * 根地址为 https 域名（如 https://cppteam.cn），与此处路径拼接即为完整 URL。
+ * 根地址为后端根 URL（如 http://47.103.51.214 或 https 域名），与此处路径拼接即为完整 URL。
  * 修改服务端路由时请同步：本文件、ApiV1Paths.kt、contracts/openapi-stub.yaml。
  */
 module.exports = {

@@ -4,7 +4,7 @@
  * 内置默认与 android/.../strings.xml 中 api_base_url 保持一致（修改时请两处同步）
  */
 const paths = require('./api-paths.js')
-const DEFAULT_BASE_URL = 'https://cppteam.cn'
+const DEFAULT_BASE_URL = 'http://47.103.51.214'
 const TOKEN_KEY = 'mp_access_token'
 
 function getToken() {

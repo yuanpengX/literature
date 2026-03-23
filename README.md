@@ -29,7 +29,7 @@ Monorepo：**Android 客户端** + **FastAPI 后端**。当前已实现：arXiv 
 
 **前置条件**
 
-1. 域名已解析到服务器公网 IP（如 `cppteam.cn`）。
+1. 域名已解析到服务器公网 IP（本仓库示例 `47.103.51.214`）。
 2. 安全组放行 **TCP 80、443**。
 3. 服务器能访问 Let’s Encrypt（不可用时见文末「自定义证书」说明）。
 
@@ -38,14 +38,14 @@ Monorepo：**Android 客户端** + **FastAPI 后端**。当前已实现：arXiv 
 ```bash
 cp deploy/https.env.example deploy/https.env
 # 编辑 deploy/https.env：
-#   LITERATURE_DOMAIN=cppteam.cn（无 https://、无端口；若 API 在子域可填 api.cppteam.cn）
+#   LITERATURE_DOMAIN=47.103.51.214（无 https://、无端口；若 API 在子域可填子域主机名）
 #   ACME_EMAIL=你的邮箱（Let’s Encrypt 账户）
 cp server/.env.example server/.env   # 按需填写密钥等
 docker compose -f docker-compose.https-stack.yml up -d --build
 ```
 
-- 对外根地址：`https://<LITERATURE_DOMAIN>`（**443**，勿写端口；例 `https://cppteam.cn/health`）
-- 客户端：将 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 的 `DEFAULT_BASE_URL` 与 [`android/.../strings.xml`](android/app/src/main/res/values/strings.xml) 的 `api_base_url` 设为同一 **https 根地址**（无尾斜杠、无 `/api/v1`）
+- 对外根地址：`https://<LITERATURE_DOMAIN>`（**443**，勿写端口；例 `https://47.103.51.214/health`，纯 IP 部署更常用根目录 `docker-compose.yml` 的 **HTTP 80**）
+- 客户端：将 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 的 `DEFAULT_BASE_URL` 与 [`android/.../strings.xml`](android/app/src/main/res/values/strings.xml) 的 `api_base_url` 设为同一 **API 根地址**（无尾斜杠、无 `/api/v1`；HTTPS 栈用 `https://`，纯 IP HTTP 用 `http://47.103.51.214`）
 - 微信公众平台 → **服务器域名** → request 合法域名填你的 **https 域名**（不要带路径）
 - 从旧部署升级时：若仅有 `LITERATURE_DOMAIN`，请在 `https.env` 中**补充** `ACME_EMAIL`
 

@@ -1,5 +1,5 @@
-const PRIVACY = 'https://cppteam.cn/privacy'
-const TERMS = 'https://cppteam.cn/terms'
+const PRIVACY = 'http://47.103.51.214/privacy'
+const TERMS = 'http://47.103.51.214/terms'
 
 Page({
   copyPrivacy() {

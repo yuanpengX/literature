@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # 下载 Android commandline-tools、安装 SDK 组件并用 Gradle 打出 release APK。
-# 无需 root；请先执行（一次即可）：sudo bash scripts/install-android-build-deps-root.sh
+# 系统依赖（JDK 等）请先执行（一次即可）：sudo bash scripts/install-android-build-deps-root.sh
+# 可用 root 或普通用户运行；root 时默认 ANDROID_HOME=/root/android-sdk。
+#
+# 双核 / 约 4G 内存：与 android/gradle.properties 中的堆上限、workers、Kotlin daemon 配合；
+# 本脚本对 Gradle 再强制 --max-workers=1。若仍 OOM，请先加 swap 或减少同时运行的服务。
+# 机器更强时可设 GRADLE_LOW_MEM=0 去掉额外 worker 限制（仍建议保留 gradle.properties 按需调大内存）。
 set -euo pipefail
 
-if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-  echo "请勿用 root 运行本脚本；请用普通用户执行，避免 Gradle/SDK 文件属主混乱。" >&2
-  echo "若尚未安装 JDK/unzip/wget，请先：sudo bash scripts/install-android-build-deps-root.sh" >&2
-  exit 1
-fi
+GRADLE_LOW_MEM="${GRADLE_LOW_MEM:-1}"
 
 if ! command -v java >/dev/null 2>&1; then
   echo "未找到 java。请先执行：sudo bash scripts/install-android-build-deps-root.sh" >&2
@@ -49,7 +50,12 @@ echo "sdk.dir=$ANDROID_HOME" >"$ANDROID_DIR/local.properties"
 
 cd "$ANDROID_DIR"
 chmod +x ./gradlew
-./gradlew --no-daemon assembleRelease
+
+gradlew_args=(--no-daemon)
+if [[ "$GRADLE_LOW_MEM" == "1" ]]; then
+  gradlew_args+=(--max-workers=1)
+fi
+./gradlew "${gradlew_args[@]}" assembleRelease
 
 # Gradle 会将 APK 同步到 android/apk/（浅路径）；否则回退默认输出目录
 SHALLOW_DIR="$ANDROID_DIR/apk"

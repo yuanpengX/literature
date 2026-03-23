@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # 在 Linux 上：编译并直接安装到已连接的手机 / 模拟器（无需手动拷 APK）。
 #
+# 双核 / 约 4G：与 android/gradle.properties、scripts/build-apk-headless.sh 一致，默认
+# --no-daemon --max-workers=1。更强机器可 GRADLE_LOW_MEM=0。
+#
 # 前置：
 #   - USB 调试已开，或模拟器已启动；执行前可运行: adb devices（应列出 device）
 #   - adb 在 PATH 中，或设置 ANDROID_HOME（会用 $ANDROID_HOME/platform-tools/adb）
@@ -16,6 +19,12 @@
 #   再运行本脚本即可。
 
 set -euo pipefail
+
+GRADLE_LOW_MEM="${GRADLE_LOW_MEM:-1}"
+gradlew_args=(--no-daemon)
+if [[ "$GRADLE_LOW_MEM" == "1" ]]; then
+  gradlew_args+=(--max-workers=1)
+fi
 
 MODE="${1:-debug}"
 
@@ -49,12 +58,12 @@ chmod +x ./gradlew
 
 case "$MODE" in
   debug)
-    ./gradlew --no-daemon installDebug
+    ./gradlew "${gradlew_args[@]}" installDebug
     echo ""
     echo "已安装 debug 包。"
     ;;
   release)
-    ./gradlew --no-daemon installRelease
+    ./gradlew "${gradlew_args[@]}" installRelease
     echo ""
     echo "已安装 release 包。"
     ;;

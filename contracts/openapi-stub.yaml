@@ -4,7 +4,7 @@ info:
   title: Literature Radar API
   version: 0.1.0
 servers:
-  - url: https://cppteam.cn
+  - url: http://47.103.51.214
     description: Production（默认 443）
   - url: http://localhost
     description: 本地 Docker（宿主机 80 → 容器内 API）

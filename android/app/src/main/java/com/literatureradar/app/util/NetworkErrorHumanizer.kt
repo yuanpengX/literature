@@ -3,8 +3,8 @@ package com.literatureradar.app.util
 /**
  * 将 OkHttp / java.net 的英文连接错误转成可读中文。
  *
- * 常见误读：「Failed to connect to cppteam.cn/150.158.x.x:443」里的 **斜杠不是 URL 拼接**，
- * 而是系统写法「主机名 / 解析到的 IP : 端口」；实际请求仍是 https://cppteam.cn/...
+ * 常见误读：「Failed to connect to 47.103.51.214/…:80」里的 **斜杠不是 URL 拼接**，
+ * 而是系统写法「主机名 / 解析到的 IP : 端口」；实际请求仍是 strings.xml 中配置的 API 根 URL…
  */
 object NetworkErrorHumanizer {
 
