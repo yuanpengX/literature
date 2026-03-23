@@ -59,6 +59,8 @@ data class DailyPicksResponseJson(
     val note: String? = null,
     val error: String? = null,
     @SerialName("server_llm_configured") val serverLlmConfigured: Boolean = false,
+    /** 已启用订阅关键词，与订阅配置页及精选预筛一致 */
+    @SerialName("subscription_keywords") val subscriptionKeywords: List<String> = emptyList(),
 )
 
 @Serializable

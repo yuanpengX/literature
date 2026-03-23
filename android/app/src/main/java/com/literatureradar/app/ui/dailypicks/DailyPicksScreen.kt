@@ -52,6 +52,7 @@ fun DailyPicksScreen(
     var note by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var serverLlm by remember { mutableStateOf(false) }
+    var subscriptionKeywords by remember { mutableStateOf<List<String>>(emptyList()) }
 
     suspend fun loadFromNetwork() {
         val r = ServiceLocator.api.getDailyPicks(date = null)
@@ -60,6 +61,7 @@ fun DailyPicksScreen(
         note = r.note
         error = r.error
         serverLlm = r.serverLlmConfigured
+        subscriptionKeywords = r.subscriptionKeywords
         if (r.items.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 dao.upsertAll(r.items.map { it.toEntity() })
@@ -119,6 +121,21 @@ fun DailyPicksScreen(
                                     modifier = Modifier.padding(top = 8.dp),
                                 )
                             }
+                            if (subscriptionKeywords.isNotEmpty()) {
+                                Text(
+                                    "已启用订阅关键词（与「设置 → 订阅配置」一致）：${subscriptionKeywords.joinToString("、")}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            } else if (serverLlm) {
+                                Text(
+                                    "当前未启用订阅关键词；精选将不按关键词预筛。可在「设置 → 订阅配置」中添加。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
                             error?.let { err ->
                                 Text(
                                     err,
@@ -147,6 +164,7 @@ fun DailyPicksScreen(
                                             note = r.note
                                             error = r.error
                                             serverLlm = r.serverLlmConfigured
+                                            subscriptionKeywords = r.subscriptionKeywords
                                             if (r.items.isNotEmpty()) {
                                                 withContext(Dispatchers.IO) {
                                                     dao.upsertAll(r.items.map { it.toEntity() })

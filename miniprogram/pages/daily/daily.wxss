@@ -35,6 +35,39 @@
   color: #B3261E;
 }
 
+.kw-block {
+  margin-top: 16rpx;
+}
+
+.kw-title {
+  display: block;
+  font-size: 24rpx;
+  color: #49454F;
+  margin-bottom: 12rpx;
+}
+
+.kw-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.kw-tag {
+  font-size: 22rpx;
+  color: #381E72;
+  background: #E8DEF8;
+  padding: 8rpx 16rpx;
+  border-radius: 16rpx;
+}
+
+.kw-hint {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #49454F;
+  line-height: 1.5;
+}
+
 .actions {
   margin-bottom: 24rpx;
 }

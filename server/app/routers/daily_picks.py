@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.catalog.presets import user_subscription_keywords_list
 from app.deps import current_user_id, get_db
 from app.models import DailyPick, UserProfile
 from app.schemas import DailyPicksResponse
@@ -33,12 +34,14 @@ def get_my_daily_picks(
     d = (date or "").strip() or _pick_date_str()
     u = db.get(UserProfile, user_id)
     items, note, err = load_daily_pick_papers(db, user_id, d)
+    kws = user_subscription_keywords_list(u) if u is not None else []
     return DailyPicksResponse(
         date=d,
         items=items,
         note=note,
         error=err,
         server_llm_configured=_server_llm_configured(u),
+        subscription_keywords=kws,
     )
 
 
@@ -60,10 +63,12 @@ def run_my_daily_pick_now(
         db.commit()
     generate_daily_pick_for_user(db, u, pick_date)
     items, note, err = load_daily_pick_papers(db, user_id, pick_date)
+    kws = user_subscription_keywords_list(u)
     return DailyPicksResponse(
         date=pick_date,
         items=items,
         note=note,
         error=err,
         server_llm_configured=True,
+        subscription_keywords=kws,
     )

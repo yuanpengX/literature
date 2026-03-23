@@ -9,6 +9,7 @@ Page({
     error: '',
     serverLlm: false,
     runLoading: false,
+    subscriptionKeywords: [],
   },
 
   onShow() {
@@ -19,12 +20,14 @@ Page({
     this.setData({ loading: true, error: '' })
     try {
       const r = await api.getDailyPicks()
+      const kws = r.subscription_keywords || []
       this.setData({
         items: r.items || [],
         pickDate: r.date || '',
         note: r.note || '',
         error: r.error || '',
         serverLlm: !!r.server_llm_configured,
+        subscriptionKeywords: Array.isArray(kws) ? kws : [],
         loading: false,
       })
     } catch (e) {
@@ -41,12 +44,14 @@ Page({
     this.setData({ runLoading: true })
     try {
       const r = await api.runDailyPicksNow()
+      const kws = r.subscription_keywords || []
       this.setData({
         items: r.items || [],
         pickDate: r.date || '',
         note: r.note || '',
         error: r.error || '',
         serverLlm: !!r.server_llm_configured,
+        subscriptionKeywords: Array.isArray(kws) ? kws : [],
         runLoading: false,
       })
       wx.showToast({ title: '已更新', icon: 'success' })

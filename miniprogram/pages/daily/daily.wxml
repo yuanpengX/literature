@@ -6,6 +6,13 @@
       <text class="date">{{pickDate}}</text>
       <text wx:if="{{note}}" class="note">{{note}}</text>
       <text wx:if="{{!serverLlm}}" class="warn">服务端未配置 LLM，精选可能为空或报错。</text>
+      <view wx:if="{{subscriptionKeywords.length}}" class="kw-block">
+        <text class="kw-title">已启用订阅关键词（与「设置 → 订阅配置」一致）</text>
+        <view class="kw-tags">
+          <text wx:for="{{subscriptionKeywords}}" wx:for-index="idx" wx:key="idx" class="kw-tag">{{item}}</text>
+        </view>
+      </view>
+      <text wx:elif="{{serverLlm}}" class="kw-hint">当前未启用订阅关键词；精选将不按关键词预筛。可在订阅配置中添加。</text>
     </view>
     <view class="actions">
       <button class="btn-run" size="mini" bindtap="runNow" loading="{{runLoading}}">立即生成</button>

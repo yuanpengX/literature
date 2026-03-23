@@ -65,6 +65,10 @@ class DailyPicksResponse(BaseModel):
     note: str | None = None
     error: str | None = None
     server_llm_configured: bool = False
+    subscription_keywords: list[str] = Field(
+        default_factory=list,
+        description="当前已启用的订阅关键词，与 /users/me/subscriptions 及每日精选预筛/LLM 提示一致",
+    )
 
 
 class SubscriptionKeywordItem(BaseModel):

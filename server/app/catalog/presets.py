@@ -178,13 +178,13 @@ def user_subscription_keywords_csv(user) -> str:
     return legacy.strip() if isinstance(legacy, str) else ""
 
 
-def keywords_csv_from_subscription_json(json_str: str) -> str:
+def _enabled_keyword_texts_from_subscription_json(json_str: str) -> list[str]:
     try:
         arr = json.loads(json_str or "[]")
     except json.JSONDecodeError:
-        return ""
+        return []
     if not isinstance(arr, list):
-        return ""
+        return []
     parts: list[str] = []
     for x in arr:
         if not isinstance(x, dict):
@@ -194,4 +194,22 @@ def keywords_csv_from_subscription_json(json_str: str) -> str:
         t = (x.get("text") or "").strip()
         if t:
             parts.append(t)
-    return ",".join(parts)
+    return parts
+
+
+def keywords_csv_from_subscription_json(json_str: str) -> str:
+    return ",".join(_enabled_keyword_texts_from_subscription_json(json_str))
+
+
+def user_subscription_keywords_list(user) -> list[str]:
+    """与 feed / 每日精选筛选一致：已启用的订阅关键词（顺序与订阅 JSON 相同）。"""
+    raw = getattr(user, "subscription_keywords_json", None) or "[]"
+    if not isinstance(raw, str):
+        raw = "[]"
+    lst = _enabled_keyword_texts_from_subscription_json(raw)
+    if lst:
+        return lst
+    legacy = getattr(user, "keywords", None) or ""
+    if isinstance(legacy, str) and legacy.strip():
+        return [p.strip() for p in legacy.split(",") if p.strip()]
+    return []
