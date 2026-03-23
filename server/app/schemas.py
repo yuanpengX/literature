@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+RankTag = Literal["trending", "fresh"]
+
 
 class PaperOut(BaseModel):
     id: int
@@ -18,6 +20,8 @@ class PaperOut(BaseModel):
     citation_count: int = 0
     hot_score: float = 0.0
     rank_reason: Literal["trending", "for_you", "recent"] | None = None
+    rank_tags: list[RankTag] = Field(default_factory=list)
+    feed_blurb: str = Field(default="", description="Feed 一句话总结（用户 LLM 缓存）")
 
     class Config:
         from_attributes = True

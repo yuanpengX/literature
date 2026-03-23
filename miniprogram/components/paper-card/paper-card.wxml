@@ -1,11 +1,13 @@
 <view class="card" bindtap="onTap">
   <view class="row-tags">
-    <text wx:if="{{reasonLabel}}" class="tag tag-reason">{{reasonLabel}}</text>
+    <block wx:for="{{tagChips}}" wx:key="text">
+      <text class="tag {{item.cls}}">{{item.text}}</text>
+    </block>
     <text class="tag tag-muted">{{paper.source}}</text>
     <text wx:if="{{paper.citation_count > 0}}" class="tag tag-muted">引用 {{paper.citation_count}}</text>
   </view>
   <text class="title">{{paper.title}}</text>
   <text wx:if="{{paper.authors_text}}" class="authors">{{paper.authors_text}}</text>
-  <view wx:if="{{pickBlurb}}" class="pick-blurb">{{pickBlurb}}</view>
+  <view wx:if="{{summaryLine}}" class="pick-blurb">{{summaryLine}}</view>
   <text class="abstract">{{paper.abstract}}</text>
 </view>

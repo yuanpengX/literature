@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     recommend_alpha_hot: float = 0.45
     recommend_beta_interest: float = 0.45
     recommend_gamma_recency: float = 0.10
+    # Feed：与每日精选同源订阅预筛；无启用订阅且为 true 时返回空列表
+    feed_strict_subscription_filter: bool = False  # FEED_STRICT_SUBSCRIPTION_FILTER
+    feed_merge_max_total: int = 900  # FEED_MERGE_MAX_TOTAL
+    feed_merge_per_channel: int = 350  # FEED_MERGE_PER_CHANNEL
+    feed_fresh_days: float = 7.0  # FEED_FRESH_DAYS
+    feed_trending_hot_norm_min: float = 0.55  # FEED_TRENDING_HOT_NORM_MIN
     # 每日精选（用户需主动同步 LLM 密钥到服务端；建议仅自建可信实例开启）
     daily_picks_hour: int = 6
     daily_picks_minute: int = 30

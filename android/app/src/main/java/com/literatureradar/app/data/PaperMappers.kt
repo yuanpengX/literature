@@ -46,5 +46,7 @@ fun PaperEntity.toPaperJson(): PaperJson =
         publishedAt = publishedAtIso,
         hotScore = hotScore,
         rankReason = rankReason,
+        rankTags = emptyList(),
+        feedBlurb = "",
         citationCount = citationCount,
     )

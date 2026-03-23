@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.catalog.presets import user_subscription_keywords_csv
 from app.config import settings
 from app.models import Paper, UserProfile
-from app.schemas import PaperOut
+from app.schemas import PaperOut, RankTag
 from app.services.tokenize import interest_match_score
 
 
@@ -40,7 +40,23 @@ def _norm(values: list[float]) -> list[float]:
     return [(v - lo) / (hi - lo) for v in values]
 
 
-def paper_to_out(p: Paper, rank_reason: str | None, hot_score: float) -> PaperOut:
+def _age_days(p: Paper, now: datetime) -> float | None:
+    ref = p.published_at or p.ingested_at
+    if ref is None:
+        return None
+    if ref.tzinfo is None:
+        ref = ref.replace(tzinfo=timezone.utc)
+    return (now - ref).total_seconds() / 86400.0
+
+
+def paper_to_out(
+    p: Paper,
+    rank_reason: str | None,
+    hot_score: float,
+    *,
+    rank_tags: list[RankTag] | None = None,
+    feed_blurb: str = "",
+) -> PaperOut:
     return PaperOut(
         id=p.id,
         external_id=p.external_id,
@@ -55,6 +71,8 @@ def paper_to_out(p: Paper, rank_reason: str | None, hot_score: float) -> PaperOu
         citation_count=p.citation_count,
         hot_score=hot_score,
         rank_reason=rank_reason,  # type: ignore[arg-type]
+        rank_tags=list(rank_tags or []),
+        feed_blurb=feed_blurb or "",
     )
 
 
@@ -110,11 +128,23 @@ def papers_to_feed_items(
 
     scored.sort(key=lambda x: x[1], reverse=True)
 
+    idx_by_id = {p.id: i for i, p in enumerate(papers)}
+    hot_thr = settings.feed_trending_hot_norm_min
+    fresh_days = settings.feed_fresh_days
+
     out: list[PaperOut] = []
     for p, _, reason in scored:
         hs = p.stats.hot_score if p.stats is not None else 0.0
         rr = None if sort_key == "recent" else reason
-        out.append(paper_to_out(p, rr, hs))
+        tags: list[RankTag] = []
+        if sort_key != "recent":
+            i = idx_by_id[p.id]
+            if reason == "trending" or hot_n[i] >= hot_thr:
+                tags.append("trending")
+            ad = _age_days(p, now)
+            if ad is not None and ad <= fresh_days:
+                tags.append("fresh")
+        out.append(paper_to_out(p, rr, hs, rank_tags=tags))
     return out
 
 

@@ -30,4 +30,6 @@ def get_paper(paper_id: int, db: Session = Depends(get_db)):
         citation_count=p.citation_count,
         hot_score=hs,
         rank_reason=None,
+        rank_tags=[],
+        feed_blurb="",
     )

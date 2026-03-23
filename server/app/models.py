@@ -63,6 +63,21 @@ class UserProfile(Base):
     )
 
 
+class PaperUserBlurb(Base):
+    """用户对某篇论文 Feed 一句话总结（用户 LLM 生成，按用户隔离）。"""
+
+    __tablename__ = "paper_user_blurbs"
+
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    paper_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("papers.id", ondelete="CASCADE"), primary_key=True
+    )
+    blurb: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class DailyPick(Base):
     """按用户、按自然日缓存 LLM 选出的论文列表。"""
 

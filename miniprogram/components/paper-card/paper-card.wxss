@@ -17,9 +17,15 @@
   font-size: 22rpx;
 }
 
-.tag-reason {
+.tag-reason,
+.tag-hot {
   color: #3D5AFE;
   font-weight: 500;
+}
+
+.tag-new {
+  color: #7D5260;
+  font-weight: 600;
 }
 
 .tag-muted {

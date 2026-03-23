@@ -1,4 +1,4 @@
-"""每日精选：合并 arXiv/期刊/会议候选，按用户关键词筛选后调用用户自备 LLM 选出至多 10 篇，并附每篇一句推荐理由。"""
+"""每日精选：合并订阅相关候选（关键词/期刊 RSS/会议 venue），预筛后调用用户自备 LLM 选出至多 10 篇，并附每篇一句推荐理由。"""
 
 from __future__ import annotations
 
@@ -16,7 +16,11 @@ from app.catalog.presets import user_subscription_keywords_csv
 from app.config import settings
 from app.models import DailyPick, Paper, UserProfile
 from app.schemas import DailyPickItemOut, PaperOut
-from app.services.recommend import load_candidate_papers, paper_to_out
+from app.services.recommend import paper_to_out
+from app.services.subscription_candidates import (
+    filter_papers_by_user_subscriptions,
+    merge_subscription_candidate_papers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,34 +33,6 @@ def _pick_date_str() -> str:
     except Exception:
         tz = ZoneInfo("Asia/Shanghai")
     return datetime.now(tz).date().isoformat()
-
-
-def _merge_channel_candidates(db: Session, max_total: int) -> list[Paper]:
-    seen: set[int] = set()
-    out: list[Paper] = []
-    for ch in ("arxiv", "journal", "conference"):
-        for p in load_candidate_papers(db, limit=120, channel=ch):
-            if p.id in seen:
-                continue
-            seen.add(p.id)
-            out.append(p)
-            if len(out) >= max_total:
-                return out
-    return out
-
-
-def _filter_by_keywords(papers: list[Paper], keywords_csv: str) -> list[Paper]:
-    kws = [k.strip().lower() for k in (keywords_csv or "").split(",") if k.strip()]
-    if not kws:
-        return papers[: settings.daily_picks_max_candidates]
-    matched: list[Paper] = []
-    for p in papers:
-        blob = f"{p.title} {p.abstract}".lower()
-        if any(k in blob for k in kws):
-            matched.append(p)
-    if not matched:
-        return papers[: settings.daily_picks_max_candidates]
-    return matched[: settings.daily_picks_max_candidates]
 
 
 def _normalize_llm_base(url: str) -> str:
@@ -224,9 +200,14 @@ def generate_daily_pick_for_user(db: Session, user: UserProfile, pick_date: str 
         if isinstance(cur, list) and len(cur) > 0:
             return
 
-    merged = _merge_channel_candidates(db, settings.daily_picks_max_candidates * 2)
+    merged = merge_subscription_candidate_papers(
+        db,
+        max_total=max(settings.daily_picks_max_candidates * 4, 120),
+        per_channel_limit=150,
+    )
+    candidates = filter_papers_by_user_subscriptions(merged, user, strict=False)
+    candidates = candidates[: max(settings.daily_picks_max_candidates * 2, 64)]
     kcsv = user_subscription_keywords_csv(user)
-    candidates = _filter_by_keywords(merged, kcsv)
     if len(candidates) < 1:
         _upsert_daily_pick_payload(
             db,
@@ -234,7 +215,7 @@ def generate_daily_pick_for_user(db: Session, user: UserProfile, pick_date: str 
             pick_date,
             "[]",
             "",
-            error_message="候选论文为空，请先完成抓取或放宽关键词",
+            error_message="候选论文为空，请先完成抓取或调整订阅（关键词/期刊/会议）",
         )
         db.commit()
         return
@@ -319,6 +300,6 @@ def load_daily_pick_items(
         if p is None:
             continue
         hs = p.stats.hot_score if p.stats is not None else 0.0
-        po = paper_to_out(p, "recent", hs)
+        po = paper_to_out(p, "recent", hs, rank_tags=[], feed_blurb="")
         ordered.append(DailyPickItemOut(paper=po, pick_blurb=blurbs.get(pid, "")))
     return ordered, row.curator_note or None, None

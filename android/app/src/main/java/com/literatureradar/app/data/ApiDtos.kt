@@ -28,6 +28,8 @@ data class PaperJson(
     @SerialName("published_at") val publishedAt: String? = null,
     @SerialName("hot_score") val hotScore: Double = 0.0,
     @SerialName("rank_reason") val rankReason: String? = null,
+    @SerialName("rank_tags") val rankTags: List<String> = emptyList(),
+    @SerialName("feed_blurb") val feedBlurb: String = "",
     @SerialName("citation_count") val citationCount: Int = 0,
 )
 

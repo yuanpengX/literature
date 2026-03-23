@@ -38,18 +38,39 @@ fun PaperCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                paper.rankReason?.let { reason ->
-                    val label = when (reason) {
-                        "trending" -> "热"
-                        "for_you" -> "兴趣"
-                        else -> reason
+                if (paper.rankTags.isNotEmpty()) {
+                    for (t in paper.rankTags) {
+                        val label = when (t) {
+                            "trending" -> "热"
+                            "fresh" -> "新"
+                            else -> t
+                        }
+                        val col = when (t) {
+                            "trending" -> MaterialTheme.colorScheme.primary
+                            "fresh" -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = col,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
                     }
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 4.dp),
-                    )
+                } else {
+                    paper.rankReason?.let { reason ->
+                        val label = when (reason) {
+                            "trending" -> "热"
+                            "for_you" -> "兴趣"
+                            else -> reason
+                        }
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                    }
                 }
                 Text(
                     text = paper.source,
@@ -79,7 +100,8 @@ fun PaperCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            pickBlurb?.takeIf { it.isNotBlank() }?.let { blurb ->
+            val blurbLine = pickBlurb?.takeIf { it.isNotBlank() } ?: paper.feedBlurb.takeIf { it.isNotBlank() }
+            blurbLine?.let { blurb ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),

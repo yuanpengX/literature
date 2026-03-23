@@ -1,12 +1,19 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
 from app.schemas import FeedResponse
-from app.services.recommend import load_candidate_papers, papers_to_feed_items
+from app.services.feed_blurbs import generate_missing_blurbs_background, merge_blurbs_into_feed_items
+from app.services.recommend import papers_to_feed_items
+from app.services.subscription_candidates import (
+    filter_papers_by_user_subscriptions,
+    merge_subscription_candidate_papers,
+    paper_matches_feed_channel,
+)
 from app.services.user_defaults import default_subscription_fields
 
 router = APIRouter(prefix="/feed", tags=["feed"])
@@ -16,6 +23,7 @@ FeedSort = Literal["recommended", "recent", "hot", "for_you"]
 
 @router.get("", response_model=FeedResponse)
 def get_feed(
+    background_tasks: BackgroundTasks,
     user_id: Annotated[str, Depends(current_user_id)],
     db: Session = Depends(get_db),
     cursor: str | None = Query(None, description="Offset string for pagination"),
@@ -55,9 +63,25 @@ def get_feed(
         db.commit()
         db.refresh(user)
 
-    papers = load_candidate_papers(db, limit=800, channel=ch)
+    merged = merge_subscription_candidate_papers(
+        db,
+        max_total=settings.feed_merge_max_total,
+        per_channel_limit=settings.feed_merge_per_channel,
+    )
+    filtered = filter_papers_by_user_subscriptions(
+        merged,
+        user,
+        strict=settings.feed_strict_subscription_filter,
+    )
+    papers = [p for p in filtered if paper_matches_feed_channel(p, ch)]
     ordered = papers_to_feed_items(papers, user, sort)
     page = ordered[offset : offset + limit]
+    merge_blurbs_into_feed_items(db, user_id, page)
+    background_tasks.add_task(
+        generate_missing_blurbs_background,
+        user_id,
+        [p.id for p in page],
+    )
     next_offset = offset + limit
     next_cursor = str(next_offset) if next_offset < len(ordered) else None
 
