@@ -45,6 +45,32 @@ def _reconstruct_abstract(inv: dict | None) -> str:
     return " ".join(positions[i] for i in sorted(positions))
 
 
+def fetch_abstract_by_doi(doi: str) -> str:
+    """
+    只读：用 DOI 解析 OpenAlex Work，取 abstract_inverted_index 拼成摘要。
+    不依赖 openalex_enabled（与抓取任务开关分离）。
+    """
+    doi = (doi or "").strip()
+    if not doi.startswith("10.") or "/" not in doi:
+        return ""
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "admin@cppteam.cn"
+    doi_url = f"https://doi.org/{doi}"
+    params = _openalex_base_params()
+    headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
+    api_path = quote(doi_url, safe="")
+    try:
+        with httpx.Client(timeout=15.0, headers=headers) as client:
+            r = client.get(f"{OPENALEX_WORKS}/{api_path}", params=params)
+        if r.status_code != 200:
+            return ""
+        w = r.json()
+    except Exception:
+        return ""
+    if not isinstance(w, dict):
+        return ""
+    return _reconstruct_abstract(w.get("abstract_inverted_index")).strip()
+
+
 def _openalex_short_id(work_url: str) -> str:
     if not work_url:
         return ""

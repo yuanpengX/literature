@@ -8,7 +8,13 @@ from app.config import settings
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
 from app.schemas import FeedResponse
-from app.services.feed_blurbs import generate_missing_blurbs_background, merge_blurbs_into_feed_items
+from app.services.abstract_enrich import enrich_papers_for_feed_ids, refresh_feed_items_abstracts
+from app.services.feed_blurbs import (
+    generate_missing_blurbs_background,
+    generate_missing_blurbs_for_user,
+    load_blurbs_for_papers,
+    merge_blurbs_into_feed_items,
+)
 from app.services.ingest import maybe_fetch_arxiv_for_user_keywords
 from app.services.recommend import papers_to_feed_items
 from app.services.subscription_candidates import (
@@ -83,22 +89,37 @@ def get_feed(
     papers = [p for p in filtered if paper_matches_feed_channel(p, ch)]
     ordered = papers_to_feed_items(papers, user, sort)
     page = ordered[offset : offset + limit]
-    merge_blurbs_into_feed_items(db, user_id, page)
-    background_tasks.add_task(
-        generate_missing_blurbs_background,
-        user_id,
-        [p.id for p in page],
+
+    blurbs_llm_ready = bool(
+        user is not None
+        and user_id != "anonymous"
+        and (user.llm_api_key or "").strip()
+        and (user.llm_base_url or "").strip()
+        and (user.llm_model or "").strip()
     )
+
+    if page:
+        if settings.abstract_enrich_enabled:
+            enrich_papers_for_feed_ids(db, [it.id for it in page])
+            refresh_feed_items_abstracts(db, page)
+        if blurbs_llm_ready:
+            generate_missing_blurbs_for_user(
+                db,
+                user_id,
+                [it.id for it in page],
+                max_papers=settings.feed_llm_blurb_sync_max,
+            )
+
+    merge_blurbs_into_feed_items(db, user_id, page)
+
+    if page and blurbs_llm_ready:
+        cached = load_blurbs_for_papers(db, user_id, [it.id for it in page])
+        still_missing = [pid for pid in [it.id for it in page] if pid not in cached]
+        if still_missing:
+            background_tasks.add_task(generate_missing_blurbs_background, user_id, still_missing)
+
     next_offset = offset + limit
     next_cursor = str(next_offset) if next_offset < len(ordered) else None
-
-    u_llm = db.get(UserProfile, user_id)
-    blurbs_llm_ready = bool(
-        u_llm
-        and (u_llm.llm_api_key or "").strip()
-        and (u_llm.llm_base_url or "").strip()
-        and (u_llm.llm_model or "").strip()
-    )
 
     return FeedResponse(
         items=page,

@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     feed_merge_per_channel: int = 350  # FEED_MERGE_PER_CHANNEL
     feed_fresh_days: float = 7.0  # FEED_FRESH_DAYS
     feed_trending_hot_norm_min: float = 0.55  # FEED_TRENDING_HOT_NORM_MIN
+    # Feed：无摘要或仅有卷期元信息时，按 DOI 二次抓取摘要（OpenAlex/Crossref/Europe PMC/S2/落地页 meta）
+    abstract_enrich_enabled: bool = True  # ABSTRACT_ENRICH_ENABLED
+    feed_abstract_enrich_max_per_request: int = 15  # 单次 Feed 最多尝试补全几条；FEED_ABSTRACT_ENRICH_MAX_PER_REQUEST
+    abstract_enrich_http_timeout: float = 10.0  # ABSTRACT_ENRICH_HTTP_TIMEOUT
+    # Feed：首屏同步调用用户 LLM 生成一句话（避免需刷新才出现）；余量仍走 BackgroundTasks
+    feed_llm_blurb_sync_max: int = 20  # FEED_LLM_BLURB_SYNC_MAX
+    feed_llm_http_timeout: float = 120.0  # 首屏同步生成 blurbs 时 LLM 超时（秒）；FEED_LLM_HTTP_TIMEOUT
     # 每日精选（用户需主动同步 LLM 密钥到服务端；建议仅自建可信实例开启）
     daily_picks_hour: int = 6
     daily_picks_minute: int = 30

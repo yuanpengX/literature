@@ -11,6 +11,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import Paper, PaperUserBlurb, UserProfile
 from app.services.text_plain import (
     feed_blurb_redundant_with_abstract,
@@ -63,7 +64,8 @@ def _call_llm_blurbs(
         "temperature": 0.2,
     }
     headers = {"Authorization": f"Bearer {api_key.strip()}", "Content-Type": "application/json"}
-    with httpx.Client(timeout=90.0) as client:
+    timeout = max(30.0, float(settings.feed_llm_http_timeout))
+    with httpx.Client(timeout=timeout) as client:
         r = client.post(url, json=payload, headers=headers)
         r.raise_for_status()
         data = r.json()
@@ -130,6 +132,72 @@ def merge_blurbs_into_feed_items(
         items[i] = it.model_copy(update={"feed_blurb": b})
 
 
+def _persist_blurbs(db: Session, user_id: str, got: dict[int, str]) -> None:
+    now = datetime.now(timezone.utc)
+    for pid, blurb in got.items():
+        if not blurb:
+            continue
+        row = db.execute(
+            select(PaperUserBlurb).where(
+                PaperUserBlurb.user_id == user_id,
+                PaperUserBlurb.paper_id == pid,
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            db.add(PaperUserBlurb(user_id=user_id, paper_id=pid, blurb=blurb, updated_at=now))
+        else:
+            row.blurb = blurb
+            row.updated_at = now
+
+
+def generate_missing_blurbs_for_user(
+    db: Session,
+    user_id: str,
+    paper_ids: list[int],
+    *,
+    max_papers: int | None = None,
+) -> int:
+    """
+    同步补全缺失的 LLM 一句话并 commit。返回本次写入的条数（可能小于 LLM 返回数）。
+    max_papers 默认 BATCH_MAX；Feed 首屏可传更大以一次请求覆盖整页。
+    """
+    if user_id in ("", "anonymous") or not paper_ids:
+        return 0
+    user = db.get(UserProfile, user_id)
+    if (
+        user is None
+        or not (user.llm_api_key or "").strip()
+        or not (user.llm_base_url or "").strip()
+        or not (user.llm_model or "").strip()
+    ):
+        return 0
+    cap = BATCH_MAX if max_papers is None else max(1, int(max_papers))
+    existing = load_blurbs_for_papers(db, user_id, paper_ids)
+    missing = [pid for pid in paper_ids if pid not in existing][:cap]
+    if not missing:
+        return 0
+    stmt = select(Paper).where(Paper.id.in_(missing))
+    papers = list(db.scalars(stmt).all())
+    if not papers:
+        return 0
+    try:
+        got = _call_llm_blurbs(user.llm_base_url, user.llm_api_key, user.llm_model, papers)
+    except Exception as e:
+        logger.warning(
+            "feed_blurbs llm failed user=%s papers=%s err=%s",
+            user_id,
+            len(papers),
+            e,
+            exc_info=True,
+        )
+        return 0
+    if not got:
+        return 0
+    _persist_blurbs(db, user_id, got)
+    db.commit()
+    return len(got)
+
+
 def generate_missing_blurbs_background(user_id: str, paper_ids: list[int]) -> None:
     """供 FastAPI BackgroundTasks 调用；独立 Session。"""
     from app.database import SessionLocal
@@ -138,49 +206,7 @@ def generate_missing_blurbs_background(user_id: str, paper_ids: list[int]) -> No
         return
     db = SessionLocal()
     try:
-        user = db.get(UserProfile, user_id)
-        if (
-            user is None
-            or not (user.llm_api_key or "").strip()
-            or not (user.llm_base_url or "").strip()
-            or not (user.llm_model or "").strip()
-        ):
-            return
-        existing = load_blurbs_for_papers(db, user_id, paper_ids)
-        missing = [pid for pid in paper_ids if pid not in existing][:BATCH_MAX]
-        if not missing:
-            return
-        stmt = select(Paper).where(Paper.id.in_(missing))
-        papers = list(db.scalars(stmt).all())
-        if not papers:
-            return
-        try:
-            got = _call_llm_blurbs(user.llm_base_url, user.llm_api_key, user.llm_model, papers)
-        except Exception as e:
-            logger.warning(
-                "feed_blurbs llm failed user=%s papers=%s err=%s",
-                user_id,
-                len(papers),
-                e,
-                exc_info=True,
-            )
-            return
-        now = datetime.now(timezone.utc)
-        for pid, blurb in got.items():
-            if not blurb:
-                continue
-            row = db.execute(
-                select(PaperUserBlurb).where(
-                    PaperUserBlurb.user_id == user_id,
-                    PaperUserBlurb.paper_id == pid,
-                )
-            ).scalar_one_or_none()
-            if row is None:
-                db.add(PaperUserBlurb(user_id=user_id, paper_id=pid, blurb=blurb, updated_at=now))
-            else:
-                row.blurb = blurb
-                row.updated_at = now
-        db.commit()
+        generate_missing_blurbs_for_user(db, user_id, paper_ids, max_papers=BATCH_MAX)
     except Exception:
         logger.exception("feed_blurbs background user=%s", user_id)
         db.rollback()
