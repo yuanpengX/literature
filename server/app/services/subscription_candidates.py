@@ -119,6 +119,27 @@ def _conference_match_needles(subscription_conferences_json: str) -> list[str]:
     return uniq
 
 
+def _user_has_any_enabled_conference_row(user: UserProfile) -> bool:
+    """订阅里是否存在任意一条启用的会议配置（与是否匹配 venue 无关）。"""
+    try:
+        arr = json.loads(getattr(user, "subscription_conferences_json", None) or "[]")
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(arr, list):
+        return False
+    return any(isinstance(x, dict) and x.get("enabled", True) for x in arr)
+
+
+def _openalex_conference_pool_hit(p: Paper, user: UserProfile) -> bool:
+    """
+    用户开启会议订阅时，允许 OpenAlex「来源类型为会议」的全局批次进入候选池。
+    仅靠 venue/标题 子串匹配时，常与 OpenAlex 展示名不一致，导致 conf_in_filtered=0。
+    """
+    if not _user_has_any_enabled_conference_row(user):
+        return False
+    return (p.source or "").lower().startswith("openalex:conference")
+
+
 def _enabled_conference_openalex_source_keys(subscription_conferences_json: str) -> set[str]:
     """用户启用的会议 OpenAlex Source 短码（大写 S…），与 Paper.openalex_source_key 对齐。"""
     out: set[str] = set()
@@ -214,7 +235,8 @@ def filter_papers_by_user_subscriptions(
     strict: bool,
 ) -> list[Paper]:
     """
-    (关键词命中) OR (期刊 RSS netloc) OR (会议 venue 子串)。
+    (关键词命中) OR (期刊 RSS netloc) OR (会议 venue/Source 子串)
+    OR（已启用会议订阅时，OpenAlex 会议类型全局批次）。
     无启用订阅时：strict=True 返回 []；strict=False 返回原列表。
     """
     u = user or UserProfile(user_id="_", keywords="", interest_blob="{}")
@@ -235,6 +257,7 @@ def filter_papers_by_user_subscriptions(
             or _journal_hit(p, netlocs)
             or _conference_hit(p, conf_needles)
             or _conference_source_key_hit(p, conf_src_keys)
+            or _openalex_conference_pool_hit(p, u)
         ):
             out.append(p)
     return out
