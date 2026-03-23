@@ -1,8 +1,9 @@
 /**
- * 与 Android LiteratureApi 对齐；Base URL 勿含 /api/v1
+ * 与 Android LiteratureApi + ApiV1Paths 对齐；根地址勿含 /api/v1（路径见 ./api-paths.js）
  * 小程序：微信登录后使用 Authorization Bearer；不再发送本地随机 X-User-Id
  * 内置默认与 android/.../strings.xml 中 api_base_url 保持一致（修改时请两处同步）
  */
+const paths = require('./api-paths.js')
 const DEFAULT_BASE_URL = 'https://cppteam.cn'
 const TOKEN_KEY = 'mp_access_token'
 
@@ -40,7 +41,7 @@ function postWechatLogin(code) {
   if (!base) {
     return Promise.reject(new Error('文献 API 根地址无效'))
   }
-  const url = joinLiteratureApiUrl(base, '/api/v1/auth/wechat/login')
+  const url = joinLiteratureApiUrl(base, paths.AUTH_WECHAT_LOGIN)
   return new Promise((resolve, reject) => {
     wx.request({
       url,
@@ -250,53 +251,57 @@ function getFeed(cursor, limit, sort, channel) {
   if (limit) q.limit = limit
   if (sort) q.sort = sort
   if (channel) q.channel = channel
-  return request('/api/v1/feed', 'GET', q)
+  return request(paths.FEED, 'GET', q)
 }
 
 function search(q, limit) {
-  return request('/api/v1/search', 'GET', { q, limit: limit || 40 })
+  return request(paths.SEARCH, 'GET', { q, limit: limit || 40 })
 }
 
 function getPaper(id) {
-  return request('/api/v1/papers/' + id, 'GET')
+  return request(paths.paper(id), 'GET')
 }
 
 function getDailyPicks(date) {
   const q = {}
   if (date) q.date = date
-  return request('/api/v1/daily-picks/me', 'GET', q)
+  return request(paths.DAILY_PICKS_ME, 'GET', q)
 }
 
 function runDailyPicksNow() {
-  return request('/api/v1/daily-picks/me/run', 'POST', {})
+  return request(paths.DAILY_PICKS_ME_RUN, 'POST', {})
+}
+
+function putPreferences(keywords) {
+  return request(paths.USERS_ME_PREFERENCES, 'PUT', { keywords: keywords || '' })
 }
 
 function putLlmCredentials(body) {
-  return request('/api/v1/users/me/llm', 'PUT', body)
+  return request(paths.USERS_ME_LLM, 'PUT', body)
 }
 
 function deleteLlmCredentials() {
-  return request('/api/v1/users/me/llm', 'DELETE')
+  return request(paths.USERS_ME_LLM, 'DELETE')
 }
 
 function getSubscriptionCatalog() {
-  return request('/api/v1/subscriptions/catalog', 'GET')
+  return request(paths.SUBSCRIPTIONS_CATALOG, 'GET')
 }
 
 function getMySubscriptions() {
-  return request('/api/v1/users/me/subscriptions', 'GET')
+  return request(paths.USERS_ME_SUBSCRIPTIONS, 'GET')
 }
 
 function putMySubscriptions(body) {
-  return request('/api/v1/users/me/subscriptions', 'PUT', body)
+  return request(paths.USERS_ME_SUBSCRIPTIONS, 'PUT', body)
 }
 
 function requestSubscriptionFetch() {
-  return request('/api/v1/users/me/subscriptions/fetch-now', 'GET')
+  return request(paths.USERS_ME_SUBSCRIPTIONS_FETCH_NOW, 'GET')
 }
 
 function postEvents(events) {
-  return request('/api/v1/events', 'POST', { events })
+  return request(paths.EVENTS, 'POST', { events })
 }
 
 module.exports = {
@@ -317,6 +322,7 @@ module.exports = {
   getPaper,
   getDailyPicks,
   runDailyPicksNow,
+  putPreferences,
   putLlmCredentials,
   deleteLlmCredentials,
   getSubscriptionCatalog,

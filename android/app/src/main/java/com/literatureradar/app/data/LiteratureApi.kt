@@ -11,7 +11,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface LiteratureApi {
-    @GET("api/v1/feed")
+    @GET(ApiV1Paths.FEED)
     suspend fun getFeed(
         @Query("cursor") cursor: String?,
         @Query("limit") limit: Int = 30,
@@ -20,42 +20,43 @@ interface LiteratureApi {
         @Query("channel") channel: String? = null,
     ): FeedResponseJson
 
-    @GET("api/v1/search")
+    @GET(ApiV1Paths.SEARCH)
     suspend fun search(
         @Query("q") q: String,
-        @Query("limit") limit: Int = 30,
+        /** 与小程序 search 默认一致 */
+        @Query("limit") limit: Int = 40,
     ): SearchResponseJson
 
-    @GET("api/v1/papers/{id}")
+    @GET(ApiV1Paths.PAPER)
     suspend fun getPaper(@Path("id") id: Int): PaperJson
 
-    @POST("api/v1/events")
+    @POST(ApiV1Paths.EVENTS)
     suspend fun postEvents(@Body body: AnalyticsBatchJson): Response<ResponseBody>
 
-    @PUT("api/v1/users/me/preferences")
+    @PUT(ApiV1Paths.USERS_ME_PREFERENCES)
     suspend fun putPreferences(@Body body: PreferencesBody): PreferencesOkJson
 
-    @PUT("api/v1/users/me/llm")
+    @PUT(ApiV1Paths.USERS_ME_LLM)
     suspend fun putLlmCredentials(@Body body: UserLlmCredentialsBody): PreferencesOkJson
 
-    @DELETE("api/v1/users/me/llm")
+    @DELETE(ApiV1Paths.USERS_ME_LLM)
     suspend fun deleteLlmCredentials(): PreferencesOkJson
 
-    @GET("api/v1/daily-picks/me")
+    @GET(ApiV1Paths.DAILY_PICKS_ME)
     suspend fun getDailyPicks(@Query("date") date: String? = null): DailyPicksResponseJson
 
-    @POST("api/v1/daily-picks/me/run")
+    @POST(ApiV1Paths.DAILY_PICKS_ME_RUN)
     suspend fun runDailyPicksNow(): DailyPicksResponseJson
 
-    @GET("api/v1/subscriptions/catalog")
+    @GET(ApiV1Paths.SUBSCRIPTIONS_CATALOG)
     suspend fun getSubscriptionCatalog(): SubscriptionCatalogJson
 
-    @GET("api/v1/users/me/subscriptions")
+    @GET(ApiV1Paths.USERS_ME_SUBSCRIPTIONS)
     suspend fun getMySubscriptions(): UserSubscriptionsJson
 
-    @PUT("api/v1/users/me/subscriptions")
+    @PUT(ApiV1Paths.USERS_ME_SUBSCRIPTIONS)
     suspend fun putMySubscriptions(@Body body: UserSubscriptionsJson): UserSubscriptionsJson
 
-    @GET("api/v1/users/me/subscriptions/fetch-now")
+    @GET(ApiV1Paths.USERS_ME_SUBSCRIPTIONS_FETCH_NOW)
     suspend fun requestSubscriptionFetch(): PreferencesOkJson
 }

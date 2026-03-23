@@ -106,6 +106,15 @@ sudo .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 80
 
 定时任务：每 2 小时执行一轮抓取（arXiv、RSS、**可选 OpenAlex 与 arXiv 引用回填**）；每日清理过期数据（见 `app/config.py` 与 `docker-compose.example.env`）。
 
+### 小程序 / Android 与后端路径一致（HTTPS）
+
+生产请求形态均为 **`https://<域名>/api/v1/...`**（根 URL 勿含 `/api/v1`，由客户端常量拼接）。同一套路由定义在：
+
+- [`miniprogram/utils/api-paths.js`](miniprogram/utils/api-paths.js)
+- [`android/app/src/main/java/com/literatureradar/app/data/ApiV1Paths.kt`](android/app/src/main/java/com/literatureradar/app/data/ApiV1Paths.kt)（供 [`LiteratureApi.kt`](android/app/src/main/java/com/literatureradar/app/data/LiteratureApi.kt) 引用）
+
+对照表见 [`contracts/openapi-stub.yaml`](contracts/openapi-stub.yaml)。改 FastAPI 路由时请同步以上三处。
+
 ---
 
 ## Android（`android/`）

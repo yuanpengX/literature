@@ -38,7 +38,7 @@
 | 收藏 | 使用 `wx.setStorageSync`，不共用 Android 的 Room 数据库。 |
 | PDF/原文 | 小程序内不直接打开外链，使用「复制链接」到浏览器查看。 |
 | AI 摘要 | 直连模型商域名，需在小程序后台将该域名加入 **request 合法域名**。 |
-| 埋点 | 未默认上报 `/api/v1/events`，可按需在 `utils/api.js` 扩展。 |
+| 埋点 | `utils/api.js` 已提供 `postEvents`（路径与 Android 一致，见 `utils/api-paths.js`）；页面可按需调用。 |
 | Tab 再次点击刷新 | 微信 TabBar 无与 Android 完全一致的「同 Tab 再点」事件；推荐页请用 **下拉刷新**（会请求 `fetch-now` 并拉取 feed）。 |
 
 ## 主题

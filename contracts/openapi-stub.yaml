@@ -1,12 +1,13 @@
+# 与 FastAPI 实现、miniprogram/utils/api-paths.js、Android ApiV1Paths.kt 对齐；生产入口为 HTTPS 根 URL（无 /api/v1）
 openapi: 3.0.3
 info:
   title: Literature Radar API
   version: 0.1.0
 servers:
   - url: https://cppteam.cn
-    description: Production (HTTPS)
+    description: Production（默认 443）
   - url: http://localhost
-    description: Local Docker（宿主机 80 → API）
+    description: 本地 Docker（宿主机 80 → 容器内 API）
 paths:
   /health:
     get:
@@ -14,6 +15,12 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/auth/wechat/login:
+    post:
+      summary: 微信小程序登录（仅小程序）
+      responses:
+        "200":
+          description: access_token
   /api/v1/feed:
     get:
       summary: Feed
@@ -23,16 +30,53 @@ paths:
           schema: { type: string }
         - in: query
           name: limit
-          schema: { type: integer, default: 20 }
+          schema: { type: integer }
         - in: query
           name: sort
-          schema: { type: string, enum: [recommended, recent] }
+          schema: { type: string }
+        - in: query
+          name: channel
+          schema: { type: string }
       responses:
         "200":
           description: Feed page
+  /api/v1/search:
+    get:
+      summary: Search
+  /api/v1/papers/{id}:
+    get:
+      summary: Paper detail
   /api/v1/events:
     post:
       summary: Analytics batch
       responses:
         "204":
           description: No content
+  /api/v1/users/me/preferences:
+    put:
+      summary: Legacy keywords（与订阅 JSON 并存）
+  /api/v1/users/me/llm:
+    put:
+      summary: 同步服务端 LLM
+    delete:
+      summary: 清除服务端 LLM
+  /api/v1/daily-picks/me:
+    get:
+      summary: 每日精选
+  /api/v1/daily-picks/me/run:
+    post:
+      summary: 立即跑每日精选
+  /api/v1/subscriptions/catalog:
+    get:
+      summary: 订阅目录
+  /api/v1/users/me/subscriptions:
+    get:
+      summary: 我的订阅
+    put:
+      summary: 更新订阅
+  /api/v1/users/me/subscriptions/fetch-now:
+    get:
+      summary: 触发订阅抓取
+  /api/v1/devices/fcm-token:
+    post:
+      summary: FCM token（可选，当前 Android 未调用）
