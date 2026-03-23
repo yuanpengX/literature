@@ -17,7 +17,8 @@ services:
       context: ./server
       dockerfile: Dockerfile
     env_file:
-      - server/.env
+      - path: server/.env
+        required: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     expose:
@@ -35,7 +36,8 @@ services:
       - "80:80"
       - "443:443"
     env_file:
-      - deploy/https.env
+      - path: deploy/https.env
+        required: false
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
