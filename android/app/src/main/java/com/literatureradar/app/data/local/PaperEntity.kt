@@ -19,5 +19,7 @@ data class PaperEntity(
     val hotScore: Double,
     val rankReason: String?,
     val citationCount: Int = 0,
+    /** 与 API `feed_blurb` 对齐；供推荐列表一句话摘要缓存 */
+    val feedBlurb: String = "",
     val cachedAtMillis: Long,
 )

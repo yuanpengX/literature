@@ -9,14 +9,14 @@
 
   <view class="section">
     <text class="h">大模型（BYOK）</text>
-    <text class="p">Key 仅存本机；请求直连模型商，须在小程序后台配置合法域名。</text>
+    <text class="p">端上要点直连模型商。保存本机后若填写了 Key，会尝试同步到文献服务器以启用每日精选与推荐一句话摘要（须可信服务）。</text>
     <picker mode="selector" range="{{providers}}" range-key="label" value="{{providerIndex}}" bindchange="onProvider">
       <view class="picker">模型商：{{providers[providerIndex].label}}</view>
     </picker>
     <input class="input" placeholder="模型 ID" value="{{llmModel}}" bindinput="onModel" />
     <input class="input" placeholder="自定义 Base URL（可选）" value="{{llmBase}}" bindinput="onLlmBase" />
     <input class="input" password placeholder="API Key" value="{{llmKey}}" bindinput="onLlmKey" />
-    <button class="btn" bindtap="saveLlmLocal">保存模型配置（本机）</button>
+    <button class="btn" bindtap="saveLlmLocal">保存并尝试同步服务器</button>
   </view>
 
   <view class="section">
@@ -26,8 +26,8 @@
   </view>
 
   <view class="section">
-    <text class="h">每日精选（服务端 LLM）</text>
-    <text class="p">将本机 Key 同步到服务器供定时任务使用（仅可信自建服务）。</text>
+    <text class="h">服务端 LLM</text>
+    <text class="p">与上方保存联动；也可单独点同步。用于每日精选与 Feed 后台摘要（仅可信自建服务）。</text>
     <button class="btn" bindtap="syncLlmServer">同步 LLM 到服务器</button>
     <button class="btn-light" bindtap="clearLlmServer">清除服务端 LLM</button>
     <text wx:if="{{llmHint}}" class="hint">{{llmHint}}</text>

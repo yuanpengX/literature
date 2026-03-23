@@ -29,7 +29,11 @@ class PaperOut(BaseModel):
 
 class FeedResponse(BaseModel):
     items: list[PaperOut]
-    next_cursor: str | None
+    next_cursor: str | None = None
+    blurbs_llm_ready: bool = Field(
+        default=False,
+        description="服务端是否已保存该用户的 LLM（用于 Feed 后台个性化摘要；否则仅有摘要截断兜底）",
+    )
 
 
 class PreferencesUpdate(BaseModel):

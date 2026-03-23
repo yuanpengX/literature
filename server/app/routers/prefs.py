@@ -40,7 +40,7 @@ def put_llm_credentials(
     body: UserLlmCredentials,
     db: Session = Depends(get_db),
 ):
-    """将 LLM 配置保存到服务器，供每日精选定时任务调用（请仅用于可信自建服务）。"""
+    """将 LLM 配置保存到服务器，供每日精选与 Feed 后台一句话摘要使用（请仅用于可信自建服务）。"""
     bu = body.base_url.strip()
     if not bu.lower().startswith("http"):
         raise HTTPException(status_code=400, detail="base_url 须为 http(s) 地址")

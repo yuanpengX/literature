@@ -85,4 +85,16 @@ def get_feed(
     next_offset = offset + limit
     next_cursor = str(next_offset) if next_offset < len(ordered) else None
 
-    return FeedResponse(items=page, next_cursor=next_cursor)
+    u_llm = db.get(UserProfile, user_id)
+    blurbs_llm_ready = bool(
+        u_llm
+        and (u_llm.llm_api_key or "").strip()
+        and (u_llm.llm_base_url or "").strip()
+        and (u_llm.llm_model or "").strip()
+    )
+
+    return FeedResponse(
+        items=page,
+        next_cursor=next_cursor,
+        blurbs_llm_ready=blurbs_llm_ready,
+    )

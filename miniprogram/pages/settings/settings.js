@@ -71,7 +71,7 @@ Page({
     this.setData({ llmKey: e.detail.value })
   },
 
-  saveLlmLocal() {
+  async saveLlmLocal() {
     const id = PROVIDERS[this.data.providerIndex].id
     llm.setLlmConfig({
       providerId: id,
@@ -79,7 +79,30 @@ Page({
       apiKey: this.data.llmKey.trim(),
       model: this.data.llmModel.trim(),
     })
-    wx.showToast({ title: '已保存', icon: 'success' })
+    wx.showToast({ title: '已保存本机', icon: 'success' })
+    const c = llm.getLlmConfig()
+    const key = (c.apiKey || '').trim()
+    if (!key) return
+    const root = llm.resolveBaseRoot(c.providerId, c.baseUrl)
+    if (!root) {
+      this.setData({
+        llmHint: '已保存本机；自定义模型商需填 Base URL 后再同步服务器',
+      })
+      return
+    }
+    const model = (c.model || '').trim() || llm.defaultModel(c.providerId)
+    try {
+      await api.putLlmCredentials({
+        base_url: root,
+        api_key: key,
+        model,
+      })
+      this.setData({ llmHint: '已同步到服务器（每日精选 + Feed 摘要）' })
+    } catch (e) {
+      this.setData({
+        llmHint: `已保存本机；同步失败：${e.message || e}`,
+      })
+    }
   },
 
   goSub() {

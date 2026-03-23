@@ -136,7 +136,7 @@ fun SettingsScreen(
 
             Text("大模型（BYOK）", style = MaterialTheme.typography.titleMedium)
             Text(
-                "API Key 仅保存在本机加密存储，不会上传到文献雷达服务器。",
+                "端上「生成中文要点」直连模型商。若要点「每日精选」与「推荐里的一句话摘要」走服务端，需在保存时把 Key 同步到你信任的文献服务器（见下方说明）。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -215,6 +215,27 @@ fun SettingsScreen(
                         store.baseUrlOverride = baseOverride.trim()
                         store.apiKey = apiKey.trim()
                         llmHint = "已保存到本机"
+                        scope.launch(Dispatchers.IO) {
+                            val st = ServiceLocator.llmStore
+                            if (st.apiKey.isBlank()) {
+                                return@launch
+                            }
+                            val hint = runCatching {
+                                ServiceLocator.api.putLlmCredentials(
+                                    UserLlmCredentialsBody(
+                                        baseUrl = st.resolvedOpenAiBaseRoot(),
+                                        apiKey = st.apiKey.trim(),
+                                        model = st.resolvedModel(),
+                                    ),
+                                )
+                            }.fold(
+                                onSuccess = { "已保存本机并已同步服务器（每日精选 + Feed 摘要）" },
+                                onFailure = { e ->
+                                    "已保存本机；同步服务器失败：${e.message ?: "未知错误"}（仍可点「同步 LLM 到服务器」重试）"
+                                },
+                            )
+                            withContext(Dispatchers.Main) { llmHint = hint }
+                        }
                     },
                     modifier = Modifier.weight(1f),
                 ) {
@@ -224,7 +245,13 @@ fun SettingsScreen(
                     onClick = {
                         store.clearApiKey()
                         apiKey = ""
-                        llmHint = "已清除 API Key"
+                        llmHint = "已清除本机 API Key"
+                        scope.launch(Dispatchers.IO) {
+                            runCatching { ServiceLocator.api.deleteLlmCredentials() }
+                            withContext(Dispatchers.Main) {
+                                llmHint = "已清除本机 Key，并已请求服务端删除 LLM 配置"
+                            }
+                        }
                     },
                 ) {
                     Text("清除 Key")
@@ -245,9 +272,9 @@ fun SettingsScreen(
                 Text("打开订阅配置")
             }
 
-            Text("每日精选（服务端 LLM）", style = MaterialTheme.typography.titleMedium)
+            Text("服务端 LLM（每日精选 / Feed 摘要）", style = MaterialTheme.typography.titleMedium)
             Text(
-                "服务器在设定时刻（默认每天 6:30，时区见服务端配置）用你的「订阅关键词」从 arXiv / 期刊 / 会议候选中筛文，并用你同步上来的 API Key 请求大模型选出约 10 篇。请勿在不信任的服务器上同步密钥。",
+                "保存模型配置时会尝试自动同步。也可手动点下面按钮。服务器用你的 Key 在定时任务中跑每日精选，并在你打开推荐列表时用后台任务补全「一句话摘要」。请勿在不信任的服务器上同步密钥。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -272,7 +299,7 @@ fun SettingsScreen(
                         }
                             .onSuccess {
                                 withContext(Dispatchers.Main) {
-                                    dailyLlmHint = "已同步 LLM 到服务器（用于每日精选）"
+                                    dailyLlmHint = "已同步 LLM 到服务器（每日精选 + Feed 摘要）"
                                 }
                             }
                             .onFailure { e ->

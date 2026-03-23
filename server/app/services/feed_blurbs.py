@@ -151,7 +151,13 @@ def generate_missing_blurbs_background(user_id: str, paper_ids: list[int]) -> No
         try:
             got = _call_llm_blurbs(user.llm_base_url, user.llm_api_key, user.llm_model, papers)
         except Exception as e:
-            logger.warning("feed_blurbs llm user=%s: %s", user_id, e)
+            logger.warning(
+                "feed_blurbs llm failed user=%s papers=%s err=%s",
+                user_id,
+                len(papers),
+                e,
+                exc_info=True,
+            )
             return
         now = datetime.now(timezone.utc)
         for pid, blurb in got.items():

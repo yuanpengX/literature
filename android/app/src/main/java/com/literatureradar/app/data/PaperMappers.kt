@@ -29,6 +29,7 @@ fun PaperJson.toEntity(cachedAtMillis: Long = System.currentTimeMillis()): Paper
         hotScore = hotScore,
         rankReason = rankReason,
         citationCount = citationCount,
+        feedBlurb = feedBlurb,
         cachedAtMillis = cachedAtMillis,
     )
 
@@ -47,6 +48,6 @@ fun PaperEntity.toPaperJson(): PaperJson =
         hotScore = hotScore,
         rankReason = rankReason,
         rankTags = emptyList(),
-        feedBlurb = "",
+        feedBlurb = feedBlurb,
         citationCount = citationCount,
     )
