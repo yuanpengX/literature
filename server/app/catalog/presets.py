@@ -24,6 +24,8 @@ class ConferencePreset:
     name: str
     abbr: str
     note: str | None = None
+    # OpenAlex Source 短码（S…）；在 openalex.org 搜索会议 proceedings 可得
+    openalex_source_id: str | None = None
 
 
 # 与药物发现 / 分子设计 / AI for science 相关；含用户点名的 JCM、JCIM 等
@@ -92,26 +94,36 @@ CONFERENCE_PRESETS: dict[str, ConferencePreset] = {
         id="neurips",
         name="NeurIPS",
         abbr="NeurIPS",
-        note="AI 顶会；会议论文多经 arXiv 收录，可结合 arXiv 频道与关键词",
+        note="AI 顶会；可在 openalex.org 搜 NeurIPS proceedings 将 Source ID 填入手动订阅",
+        openalex_source_id=None,
     ),
-    "icml": ConferencePreset(id="icml", name="International Conference on Machine Learning", abbr="ICML", note=None),
+    "icml": ConferencePreset(
+        id="icml",
+        name="International Conference on Machine Learning",
+        abbr="ICML",
+        note=None,
+        openalex_source_id=None,
+    ),
     "iclr": ConferencePreset(
         id="iclr",
         name="International Conference on Learning Representations",
         abbr="ICLR",
         note=None,
+        openalex_source_id=None,
     ),
     "ismb": ConferencePreset(
         id="ismb",
         name="Intelligent Systems for Molecular Biology",
         abbr="ISMB",
         note="计算生物学 / 生物信息学重要会议",
+        openalex_source_id=None,
     ),
     "recomb": ConferencePreset(
         id="recomb",
         name="Research in Computational Molecular Biology",
         abbr="RECOMB",
         note=None,
+        openalex_source_id=None,
     ),
 }
 
@@ -152,6 +164,18 @@ def default_subscription_conferences() -> list[dict]:
         {"id": "ismb", "enabled": True},
         {"id": "recomb", "enabled": True},
     ]
+
+
+def user_subscription_keywords_csv(user) -> str:
+    """推荐 / 每日精选统一用：订阅 JSON 优先，否则旧版 keywords CSV。"""
+    raw = getattr(user, "subscription_keywords_json", None) or "[]"
+    if not isinstance(raw, str):
+        raw = "[]"
+    s = keywords_csv_from_subscription_json(raw)
+    if s.strip():
+        return s
+    legacy = getattr(user, "keywords", None) or ""
+    return legacy.strip() if isinstance(legacy, str) else ""
 
 
 def keywords_csv_from_subscription_json(json_str: str) -> str:

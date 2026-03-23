@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.catalog.presets import user_subscription_keywords_csv
 from app.config import settings
 from app.models import Paper, UserProfile
 from app.schemas import PaperOut
@@ -47,7 +48,7 @@ def papers_to_feed_items(
     now = datetime.now(timezone.utc)
     user = user or UserProfile(user_id="_", keywords="", interest_blob="{}")
     blobs = user.interest_blob or "{}"
-    kws = user.keywords or ""
+    kws = user_subscription_keywords_csv(user)
 
     hot_raw: list[float] = []
     interest_raw: list[float] = []

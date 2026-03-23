@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from app.catalog.presets import (
@@ -18,6 +18,7 @@ from app.catalog.presets import (
 )
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
+from app.services.ingest import run_ingestion_standalone
 from app.schemas import (
     ConferencePresetOut,
     JournalPresetOut,
@@ -64,7 +65,16 @@ def _parse_journals(json_str: str) -> list[SubscriptionJournalItem]:
         jid = (x.get("id") or "").strip()
         if not jid:
             continue
-        out.append(SubscriptionJournalItem(id=jid, enabled=bool(x.get("enabled", True))))
+        nm = x.get("name")
+        rs = x.get("rss")
+        out.append(
+            SubscriptionJournalItem(
+                id=jid,
+                enabled=bool(x.get("enabled", True)),
+                name=str(nm).strip() if nm else None,
+                rss=str(rs).strip() if rs else None,
+            )
+        )
     return out
 
 
@@ -82,7 +92,16 @@ def _parse_conferences(json_str: str) -> list[SubscriptionConferenceItem]:
         cid = (x.get("id") or "").strip()
         if not cid:
             continue
-        out.append(SubscriptionConferenceItem(id=cid, enabled=bool(x.get("enabled", True))))
+        nm = x.get("name")
+        oid = x.get("openalex_source_id")
+        out.append(
+            SubscriptionConferenceItem(
+                id=cid,
+                enabled=bool(x.get("enabled", True)),
+                name=str(nm).strip() if nm else None,
+                openalex_source_id=str(oid).strip() if oid else None,
+            )
+        )
     return out
 
 
@@ -123,7 +142,13 @@ def get_subscription_catalog():
         for p in sorted(JOURNAL_PRESETS.values(), key=lambda x: x.name)
     ]
     conferences = [
-        ConferencePresetOut(id=p.id, name=p.name, abbr=p.abbr, note=p.note)
+        ConferencePresetOut(
+            id=p.id,
+            name=p.name,
+            abbr=p.abbr,
+            note=p.note,
+            openalex_source_id=p.openalex_source_id,
+        )
         for p in sorted(CONFERENCE_PRESETS.values(), key=lambda x: x.name)
     ]
     dk = [SubscriptionKeywordItem(**x) for x in default_subscription_keywords()]
@@ -136,6 +161,17 @@ def get_subscription_catalog():
         default_journals=dj,
         default_conferences=dc,
     )
+
+
+@router.get("/users/me/subscriptions/fetch-now")
+def get_subscription_fetch_now(
+    user_id: Annotated[str, Depends(current_user_id)],
+    background_tasks: BackgroundTasks,
+):
+    """手动触发一次全库抓取（合并所有用户的期刊 RSS、会议 OpenAlex 等）。与定时任务相同逻辑。"""
+    _ = user_id
+    background_tasks.add_task(run_ingestion_standalone)
+    return {"ok": True}
 
 
 @router.get("/users/me/subscriptions", response_model=UserSubscriptionsResponse)
@@ -172,6 +208,7 @@ def get_my_subscriptions(
 def put_my_subscriptions(
     user_id: Annotated[str, Depends(current_user_id)],
     body: UserSubscriptionsPut,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     kw_j = json.dumps(
@@ -198,6 +235,7 @@ def put_my_subscriptions(
         u.subscription_journals_json = j_j
         u.subscription_conferences_json = c_j
     db.commit()
+    background_tasks.add_task(run_ingestion_standalone)
 
     return UserSubscriptionsResponse(
         keywords=_parse_keywords(u.subscription_keywords_json),

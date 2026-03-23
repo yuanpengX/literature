@@ -1,0 +1,59 @@
+.page {
+  min-height: 100vh;
+  padding-bottom: 24rpx;
+}
+
+.tabs {
+  display: flex;
+  background: #FFFBFE;
+  padding: 16rpx 24rpx;
+  gap: 16rpx;
+  border-bottom: 1rpx solid #E7E0EC;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: 24rpx;
+  font-size: 26rpx;
+  color: #49454F;
+  background: #F3EDF7;
+}
+
+.tab-on {
+  background: #E8DEF8;
+  color: #3D5AFE;
+  font-weight: 600;
+}
+
+.list-wrap {
+  padding: 24rpx;
+}
+
+.center,
+.empty {
+  padding: 120rpx 48rpx;
+  text-align: center;
+  color: #49454F;
+}
+
+.empty-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+  color: #1C1B1F;
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.more-btn {
+  margin: 16rpx 0 48rpx;
+  background: #3D5AFE;
+  color: #fff;
+  border-radius: 24rpx;
+}

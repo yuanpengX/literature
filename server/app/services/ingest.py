@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -12,11 +13,19 @@ import json
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.catalog.presets import JOURNAL_PRESETS
+from app.catalog.presets import CONFERENCE_PRESETS, JOURNAL_PRESETS
 from app.config import settings
 from app.models import Paper, UserProfile
-from app.services.openalex import enrich_arxiv_citations, fetch_and_upsert_openalex
+from app.database import SessionLocal
+from app.services.openalex import (
+    enrich_arxiv_citations,
+    fetch_and_upsert_openalex,
+    fetch_and_upsert_openalex_conference_works,
+    fetch_and_upsert_openalex_for_source_ids,
+    normalize_openalex_source_id,
+)
 
+logger = logging.getLogger(__name__)
 
 ARXIV_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
@@ -153,7 +162,7 @@ def fetch_and_upsert_rss(db: Session, feed_url: str) -> int:
 
 
 def collect_subscription_rss_urls(db: Session) -> list[str]:
-    """合并所有用户已启用期刊预设对应的 RSS，去重。"""
+    """合并所有用户已启用期刊：预设 RSS + 手动填写的 rss URL，去重。"""
     seen: set[str] = set()
     out: list[str] = []
     for row in db.scalars(select(UserProfile)):
@@ -166,6 +175,12 @@ def collect_subscription_rss_urls(db: Session) -> list[str]:
         for item in arr:
             if not isinstance(item, dict) or not item.get("enabled", True):
                 continue
+            custom = (item.get("rss") or "").strip()
+            if custom.startswith(("http://", "https://")):
+                if custom not in seen:
+                    seen.add(custom)
+                    out.append(custom)
+                continue
             jid = item.get("id")
             if not jid or not isinstance(jid, str):
                 continue
@@ -175,6 +190,38 @@ def collect_subscription_rss_urls(db: Session) -> list[str]:
             if preset.rss not in seen:
                 seen.add(preset.rss)
                 out.append(preset.rss)
+    return out
+
+
+def collect_subscription_openalex_source_ids(db: Session) -> list[str]:
+    """所有用户已启用会议：预设里的 OpenAlex Source + 手动填写的 openalex_source_id。"""
+    seen: set[str] = set()
+    out: list[str] = []
+    for row in db.scalars(select(UserProfile)):
+        try:
+            arr = json.loads(row.subscription_conferences_json or "[]")
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(arr, list):
+            continue
+        for item in arr:
+            if not isinstance(item, dict) or not item.get("enabled", True):
+                continue
+            raw_oid = (item.get("openalex_source_id") or "").strip()
+            if raw_oid:
+                oid = normalize_openalex_source_id(raw_oid)
+                if oid and oid not in seen:
+                    seen.add(oid)
+                    out.append(oid)
+                continue
+            cid = (item.get("id") or "").strip()
+            preset = CONFERENCE_PRESETS.get(cid)
+            if not preset:
+                continue
+            pid = getattr(preset, "openalex_source_id", None)
+            if pid and str(pid).strip() and str(pid) not in seen:
+                seen.add(str(pid).strip())
+                out.append(str(pid).strip())
     return out
 
 
@@ -189,5 +236,20 @@ def run_all_ingestion(db: Session) -> dict[str, int]:
         key = f"rss_sub:{sub_url[:40]}"
         out[key] = fetch_and_upsert_rss(db, sub_url)
     out["openalex_new"] = fetch_and_upsert_openalex(db)
+    out["openalex_conference_new"] = fetch_and_upsert_openalex_conference_works(db)
+    src_ids = collect_subscription_openalex_source_ids(db)
+    out["openalex_subscription_sources"] = fetch_and_upsert_openalex_for_source_ids(db, src_ids)
     out["arxiv_citations_updated"] = enrich_arxiv_citations(db)
     return out
+
+
+def run_ingestion_standalone() -> None:
+    """定时任务与「保存订阅」后台任务共用。"""
+    db = SessionLocal()
+    try:
+        out = run_all_ingestion(db)
+        logger.info("ingestion %s", out)
+    except Exception:
+        logger.exception("ingestion failed")
+    finally:
+        db.close()

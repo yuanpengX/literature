@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     openalex_enrich_arxiv_citations: bool = True
     openalex_enrich_per_run: int = 20
     openalex_enrich_pool: int = 120
+    # 订阅会议 + 「会议」频道：按 OpenAlex 来源类型 conference 拉一批近期论文
+    openalex_fetch_conference_works: bool = True
+    # 用户订阅里指定的 OpenAlex Source 每源抓取条数
+    openalex_subscription_per_source: int = 35
+    # 全库抓取定时任务间隔（小时），与每日精选任务独立
+    ingest_interval_hours: float = 1.0
     paper_ttl_days: int = 60
     event_ttl_days: int = 30
     recommend_alpha_hot: float = 0.45

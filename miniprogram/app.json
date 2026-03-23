@@ -1,0 +1,60 @@
+{
+  "pages": [
+    "pages/feed/feed",
+    "pages/daily/daily",
+    "pages/search/search",
+    "pages/saved/saved",
+    "pages/settings/settings",
+    "pages/detail/detail",
+    "pages/subscriptions/subscriptions",
+    "pages/about/about"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#F7F2FA",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "文献雷达",
+    "backgroundTextStyle": "dark",
+    "backgroundColor": "#F7F2FA"
+  },
+  "tabBar": {
+    "color": "#49454F",
+    "selectedColor": "#3D5AFE",
+    "backgroundColor": "#FFFBFE",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/feed/feed",
+        "text": "推荐",
+        "iconPath": "images/tab-home.png",
+        "selectedIconPath": "images/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/daily/daily",
+        "text": "精选",
+        "iconPath": "images/tab-daily.png",
+        "selectedIconPath": "images/tab-daily-active.png"
+      },
+      {
+        "pagePath": "pages/search/search",
+        "text": "搜索",
+        "iconPath": "images/tab-search.png",
+        "selectedIconPath": "images/tab-search-active.png"
+      },
+      {
+        "pagePath": "pages/saved/saved",
+        "text": "收藏",
+        "iconPath": "images/tab-saved.png",
+        "selectedIconPath": "images/tab-saved-active.png"
+      },
+      {
+        "pagePath": "pages/settings/settings",
+        "text": "设置",
+        "iconPath": "images/tab-settings.png",
+        "selectedIconPath": "images/tab-settings-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

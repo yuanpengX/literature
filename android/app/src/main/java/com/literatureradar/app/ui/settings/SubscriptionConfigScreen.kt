@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -50,6 +49,7 @@ import com.literatureradar.app.data.UserSubscriptionsJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +72,12 @@ fun SubscriptionConfigScreen(
     var newKeyword by remember { mutableStateOf("") }
     var addJournalOpen by remember { mutableStateOf(false) }
     var addConferenceOpen by remember { mutableStateOf(false) }
+    var manualJournalOpen by remember { mutableStateOf(false) }
+    var manualJournalName by remember { mutableStateOf("") }
+    var manualJournalRss by remember { mutableStateOf("") }
+    var manualConferenceOpen by remember { mutableStateOf(false) }
+    var manualConferenceName by remember { mutableStateOf("") }
+    var manualConferenceOid by remember { mutableStateOf("") }
 
     fun journalPreset(id: String): JournalPresetJson? =
         catalog?.journals?.find { it.id == id }
@@ -116,7 +122,7 @@ fun SubscriptionConfigScreen(
                 .padding(horizontal = 16.dp),
         ) {
             Text(
-                "按期刊名使用服务端预设的 RSS；关键词用于推荐与每日精选；会议为关注列表（论文多来自 OpenAlex / arXiv 等，后续可扩展专用源）。",
+                "期刊可从目录选或自填 RSS；会议可从目录选或在 openalex.org 查 proceedings 的 Source ID 手动添加。保存后会触发服务端抓取（与定时任务相同）。关键词与推荐、每日精选一致。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -141,13 +147,15 @@ fun SubscriptionConfigScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("期刊", style = MaterialTheme.typography.titleMedium)
+                        Text("期刊", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                         TextButton(
                             onClick = { addJournalOpen = true },
                             enabled = catalog != null,
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                            Text("添加")
+                            Text("目录")
+                        }
+                        TextButton(onClick = { manualJournalOpen = true }) {
+                            Text("自定义RSS")
                         }
                     }
                     LazyColumn(
@@ -157,17 +165,23 @@ fun SubscriptionConfigScreen(
                         items(journalItems.size, key = { journalItems[it].id }) { idx ->
                             val item = journalItems[idx]
                             val p = journalPreset(item.id)
+                            val titleText = p?.name ?: item.name?.takeIf { it.isNotBlank() } ?: item.id
+                            val subText = when {
+                                !item.rss.isNullOrBlank() -> item.rss
+                                p != null -> listOfNotNull(p.abbr, p.issn).joinToString(" · ")
+                                else -> item.id
+                            }
                             Row(
                                 Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
                                     Text(
-                                        p?.name ?: item.id,
+                                        titleText,
                                         style = MaterialTheme.typography.bodyLarge,
                                     )
                                     Text(
-                                        listOfNotNull(p?.abbr, p?.issn).joinToString(" · "),
+                                        subText,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -193,13 +207,15 @@ fun SubscriptionConfigScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("会议", style = MaterialTheme.typography.titleMedium)
+                        Text("会议", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                         TextButton(
                             onClick = { addConferenceOpen = true },
                             enabled = catalog != null,
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                            Text("添加")
+                            Text("目录")
+                        }
+                        TextButton(onClick = { manualConferenceOpen = true }) {
+                            Text("手动")
                         }
                     }
                     LazyColumn(
@@ -209,12 +225,23 @@ fun SubscriptionConfigScreen(
                         items(conferenceItems.size, key = { conferenceItems[it].id }) { idx ->
                             val item = conferenceItems[idx]
                             val p = conferencePreset(item.id)
+                            val cpre = catalog?.conferences?.find { it.id == item.id }
+                            val titleText = p?.name ?: item.name?.takeIf { it.isNotBlank() } ?: item.id
                             Row(
                                 Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(p?.name ?: item.id, style = MaterialTheme.typography.bodyLarge)
+                                    Text(titleText, style = MaterialTheme.typography.bodyLarge)
+                                    val oidLine = item.openalexSourceId?.takeIf { it.isNotBlank() }
+                                        ?: cpre?.openalexSourceId?.takeIf { it.isNotBlank() }
+                                    if (oidLine != null) {
+                                        Text(
+                                            "OpenAlex: $oidLine",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                     p?.note?.takeIf { it.isNotBlank() }?.let { n ->
                                         Text(
                                             n,
@@ -400,6 +427,115 @@ fun SubscriptionConfigScreen(
             },
             confirmButton = {
                 TextButton(onClick = { addConferenceOpen = false }) { Text("关闭") }
+            },
+        )
+    }
+
+    if (manualJournalOpen) {
+        AlertDialog(
+            onDismissRequest = { manualJournalOpen = false },
+            title = { Text("自定义期刊（RSS）") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = manualJournalName,
+                        onValueChange = { manualJournalName = it },
+                        label = { Text("显示名称") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = manualJournalRss,
+                        onValueChange = { manualJournalRss = it },
+                        label = { Text("RSS 地址") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = false,
+                        minLines = 2,
+                        placeholder = { Text("https://…") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val rss = manualJournalRss.trim()
+                        val name = manualJournalName.trim().ifBlank { rss.take(40) }
+                        if (!rss.startsWith("http://") && !rss.startsWith("https://")) {
+                            hint = "RSS 须以 http(s):// 开头"
+                            return@TextButton
+                        }
+                        val id = "u:j:${UUID.randomUUID().toString().substring(0, 8)}"
+                        journalItems.add(
+                            SubscriptionJournalItemJson(id = id, enabled = true, name = name, rss = rss),
+                        )
+                        manualJournalOpen = false
+                        manualJournalName = ""
+                        manualJournalRss = ""
+                        hint = "已添加，请点「保存到服务器」"
+                    },
+                ) { Text("添加") }
+            },
+            dismissButton = {
+                TextButton(onClick = { manualJournalOpen = false }) { Text("取消") }
+            },
+        )
+    }
+
+    if (manualConferenceOpen) {
+        AlertDialog(
+            onDismissRequest = { manualConferenceOpen = false },
+            title = { Text("手动添加会议") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "在 openalex.org 搜索会议 proceedings，打开 Source 页面，复制以 S 开头的 ID 或整段 URL。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = manualConferenceName,
+                        onValueChange = { manualConferenceName = it },
+                        label = { Text("显示名称（可选）") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = manualConferenceOid,
+                        onValueChange = { manualConferenceOid = it },
+                        label = { Text("OpenAlex Source ID") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("例：S27588008584") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val oid = manualConferenceOid.trim()
+                        if (oid.isBlank()) {
+                            hint = "请填写 OpenAlex Source ID"
+                            return@TextButton
+                        }
+                        val id = "u:c:${UUID.randomUUID().toString().substring(0, 8)}"
+                        val name = manualConferenceName.trim().ifBlank { oid }
+                        conferenceItems.add(
+                            SubscriptionConferenceItemJson(
+                                id = id,
+                                enabled = true,
+                                name = name,
+                                openalexSourceId = oid,
+                            ),
+                        )
+                        manualConferenceOpen = false
+                        manualConferenceName = ""
+                        manualConferenceOid = ""
+                        hint = "已添加，请保存（需服务端 OPENALEX_ENABLED=true）"
+                    },
+                ) { Text("添加") }
+            },
+            dismissButton = {
+                TextButton(onClick = { manualConferenceOpen = false }) { Text("取消") }
             },
         )
     }

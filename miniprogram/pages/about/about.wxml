@@ -1,0 +1,10 @@
+<scroll-view scroll-y class="page">
+  <text class="name">文献雷达</text>
+  <text class="ver">小程序版（与 Android 功能对齐）</text>
+  <text class="body">
+    用于追踪 arXiv、RSS、OpenAlex 等来源的新论文与推荐。大模型摘要通过自备 API Key 在端上请求（须配置合法域名）。
+  </text>
+  <text class="h">合规链接</text>
+  <button class="link" bindtap="copyPrivacy">复制隐私政策 URL</button>
+  <button class="link" bindtap="copyTerms">复制服务条款 URL</button>
+</scroll-view>

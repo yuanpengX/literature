@@ -75,11 +75,18 @@ class SubscriptionKeywordItem(BaseModel):
 class SubscriptionJournalItem(BaseModel):
     id: str
     enabled: bool = True
+    name: str | None = Field(default=None, description="自定义期刊展示名")
+    rss: str | None = Field(default=None, description="自定义 RSS；若填写则优先于预设")
 
 
 class SubscriptionConferenceItem(BaseModel):
     id: str
     enabled: bool = True
+    name: str | None = Field(default=None, description="自定义会议展示名")
+    openalex_source_id: str | None = Field(
+        default=None,
+        description="OpenAlex Source ID，如 S1234567890 或 https://openalex.org/S…",
+    )
 
 
 class JournalPresetOut(BaseModel):
@@ -95,6 +102,7 @@ class ConferencePresetOut(BaseModel):
     name: str
     abbr: str
     note: str | None = None
+    openalex_source_id: str | None = None
 
 
 class SubscriptionCatalogResponse(BaseModel):

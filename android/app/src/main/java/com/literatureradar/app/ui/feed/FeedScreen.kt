@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -160,6 +161,7 @@ fun FeedScreen(
         if (tabReselectSignal <= 0) return@LaunchedEffect
         refreshing = true
         error = null
+        runCatching { ServiceLocator.api.requestSubscriptionFetch() }
         runCatching { refreshFirstPage() }
             .onFailure { error = it.message }
         refreshing = false
@@ -190,6 +192,7 @@ fun FeedScreen(
                 scope.launch {
                     refreshing = true
                     error = null
+                    runCatching { ServiceLocator.api.requestSubscriptionFetch() }
                     runCatching { refreshFirstPage() }
                         .onFailure { error = it.message }
                     refreshing = false
@@ -199,54 +202,73 @@ fun FeedScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            when {
-                loading && items.isEmpty() -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                error != null && items.isEmpty() -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(error!!, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-                !loading && items.isEmpty() -> {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text("暂无推荐", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                "当前频道下没有可展示的论文。请下拉刷新，或再点一次底部「推荐」。",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            if (selectedChannel == FeedChannel.Conference) {
-                                Text(
-                                    "「会议」依赖 OpenAlex 抓取且来源类型为会议；若未开启 OpenAlex 或库中无此类数据，此处会为空。",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when {
+                    loading && items.isEmpty() -> {
+                        item(key = "loading") {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 420.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
                             }
-                            Text(
-                                "也可在浏览器访问：…/api/v1/feed?channel=${selectedChannel.apiValue}&limit=5 检查 items。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
-                }
-                else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
+                    error != null && items.isEmpty() -> {
+                        item(key = "error") {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 420.dp)
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(error!!, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                    !loading && items.isEmpty() -> {
+                        item(key = "empty") {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 420.dp)
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text("暂无推荐", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "当前频道下没有可展示的论文。下拉可请求服务端抓取并刷新列表。",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (selectedChannel == FeedChannel.Conference) {
+                                        Text(
+                                            "「会议」需服务端开启 OpenAlex，并拉取会议类型来源或您在订阅里填写的 Source ID。",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Text(
+                                        "也可在浏览器访问：…/api/v1/feed?channel=${selectedChannel.apiValue}&limit=5 检查 items。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    else -> {
                         itemsIndexed(items, key = { _, p -> p.id }) { index, paper ->
                             PaperCard(
                                 paper = paper,
@@ -264,7 +286,7 @@ fun FeedScreen(
                                 },
                             )
                         }
-                        item {
+                        item(key = "more") {
                             if (nextCursor != null) {
                                 Box(
                                     Modifier

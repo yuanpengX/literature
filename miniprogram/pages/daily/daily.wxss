@@ -1,0 +1,49 @@
+.page {
+  min-height: 100vh;
+  padding: 24rpx;
+}
+
+.center,
+.empty {
+  padding: 80rpx 32rpx;
+  text-align: center;
+  color: #49454F;
+}
+
+.meta {
+  margin-bottom: 24rpx;
+}
+
+.date {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1C1B1F;
+}
+
+.note {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #49454F;
+}
+
+.warn {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #B3261E;
+}
+
+.actions {
+  margin-bottom: 24rpx;
+}
+
+.btn-run {
+  background: #3D5AFE;
+  color: #fff;
+}
+
+.list {
+  padding-bottom: 48rpx;
+}

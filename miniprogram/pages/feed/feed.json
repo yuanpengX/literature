@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "paper-card": "/components/paper-card/paper-card"
+  },
+  "enablePullDownRefresh": true,
+  "navigationBarTitleText": "推荐",
+  "backgroundTextStyle": "dark"
+}

@@ -1,0 +1,9 @@
+<view class="card" bindtap="onTap">
+  <view class="row-tags">
+    <text wx:if="{{reasonLabel}}" class="tag tag-reason">{{reasonLabel}}</text>
+    <text class="tag tag-muted">{{paper.source}}</text>
+    <text wx:if="{{paper.citation_count > 0}}" class="tag tag-muted">引用 {{paper.citation_count}}</text>
+  </view>
+  <text class="title">{{paper.title}}</text>
+  <text class="abstract">{{paper.abstract}}</text>
+</view>

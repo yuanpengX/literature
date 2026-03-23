@@ -80,12 +80,16 @@ data class SubscriptionKeywordItemJson(
 data class SubscriptionJournalItemJson(
     val id: String,
     val enabled: Boolean = true,
+    val name: String? = null,
+    val rss: String? = null,
 )
 
 @Serializable
 data class SubscriptionConferenceItemJson(
     val id: String,
     val enabled: Boolean = true,
+    val name: String? = null,
+    @SerialName("openalex_source_id") val openalexSourceId: String? = null,
 )
 
 @Serializable
@@ -103,6 +107,7 @@ data class ConferencePresetJson(
     val name: String,
     val abbr: String,
     val note: String? = null,
+    @SerialName("openalex_source_id") val openalexSourceId: String? = null,
 )
 
 @Serializable

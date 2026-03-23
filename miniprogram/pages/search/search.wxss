@@ -1,0 +1,31 @@
+.page {
+  padding: 32rpx;
+  min-height: 100vh;
+}
+
+.form {
+  margin-bottom: 24rpx;
+}
+
+.input {
+  border: 2rpx solid #CAC4D0;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  background: #FFFBFE;
+}
+
+.btn-search {
+  background: #3D5AFE;
+  color: #fff;
+  border-radius: 24rpx;
+}
+
+.hint {
+  color: #49454F;
+  font-size: 26rpx;
+}
+
+.list {
+  margin-top: 24rpx;
+}

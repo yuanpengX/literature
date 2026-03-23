@@ -1,0 +1,4 @@
+{
+  "desc": "文献雷达",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

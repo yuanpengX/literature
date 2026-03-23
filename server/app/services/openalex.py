@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
 
@@ -60,30 +61,43 @@ def _build_openalex_filter() -> str:
     ]
     vid = settings.openalex_venue_source_id.strip()
     if vid:
-        parts.append(f"primary_location.source.id:{vid}")
+        parts.append(f"primary_location.source.id:{_normalize_openalex_source_filter_value(vid)}")
     extra = settings.openalex_filter_extra.strip()
     if extra:
         parts.append(extra)
     return ",".join(parts)
 
 
-def fetch_and_upsert_openalex(db: Session) -> int:
-    if not settings.openalex_enabled:
-        return 0
-    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
-    params = {
-        "filter": _build_openalex_filter(),
-        "per_page": min(max(settings.openalex_per_page, 1), 200),
-        "sort": "publication_date:desc",
-        "mailto": mailto,
-    }
-    headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
-    with httpx.Client(timeout=90.0, headers=headers) as client:
-        r = client.get(OPENALEX_WORKS, params=params)
-        r.raise_for_status()
-        data = r.json()
+def _normalize_openalex_source_filter_value(raw: str) -> str:
+    """OpenAlex filter 中 source.id 可用短码 S123 或完整 URL。"""
+    s = raw.strip()
+    if not s:
+        return s
+    if s.startswith("http"):
+        return s.rstrip("/")
+    if re.match(r"^S\d+$", s, re.I):
+        return f"https://openalex.org/{s}"
+    if s.isdigit():
+        return f"https://openalex.org/S{s}"
+    return s
 
-    results = data.get("results") or []
+
+def normalize_openalex_source_id(raw: str | None) -> str | None:
+    if not raw or not str(raw).strip():
+        return None
+    s = str(raw).strip()
+    if s.startswith("http"):
+        tail = s.rstrip("/").rsplit("/", 1)[-1]
+        return tail if tail.startswith("S") else None
+    if re.match(r"^S\d+$", s, re.I):
+        return s.upper() if s[0] == "s" else s
+    if s.isdigit():
+        return f"S{s}"
+    return None
+
+
+def _upsert_openalex_works_batch(db: Session, results: list) -> int:
+    """将 OpenAlex works 列表写入 papers，返回新增条数。"""
     count = 0
     for w in results:
         if not isinstance(w, dict):
@@ -144,8 +158,95 @@ def fetch_and_upsert_openalex(db: Session) -> int:
     return count
 
 
+def _openalex_fetch_results(filter_str: str) -> list:
+    if not settings.openalex_enabled:
+        return []
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    params = {
+        "filter": filter_str,
+        "per_page": min(max(settings.openalex_per_page, 1), 200),
+        "sort": "publication_date:desc",
+        "mailto": mailto,
+    }
+    headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
+    with httpx.Client(timeout=90.0, headers=headers) as client:
+        r = client.get(OPENALEX_WORKS, params=params)
+        r.raise_for_status()
+        data = r.json()
+    return data.get("results") or []
+
+
+def fetch_and_upsert_openalex(db: Session) -> int:
+    if not settings.openalex_enabled:
+        return 0
+    results = _openalex_fetch_results(_build_openalex_filter())
+    return _upsert_openalex_works_batch(db, results)
+
+
+def fetch_and_upsert_openalex_conference_works(db: Session) -> int:
+    """按「来源类型为会议」拉一批论文，填充「会议」频道（需开启 OpenAlex）。"""
+    if not settings.openalex_enabled or not settings.openalex_fetch_conference_works:
+        return 0
+    d = date.today() - timedelta(days=settings.openalex_lookback_days)
+    filt = ",".join(
+        [
+            "type:article",
+            f"from_publication_date:{d.isoformat()}",
+            "is_paratext:false",
+            "primary_location.source.type:conference",
+        ]
+    )
+    try:
+        results = _openalex_fetch_results(filt)
+        return _upsert_openalex_works_batch(db, results)
+    except Exception:
+        logger.warning("openalex conference batch failed (filter may be unsupported)", exc_info=True)
+        return 0
+
+
+def fetch_and_upsert_openalex_for_source_ids(db: Session, source_ids: list[str]) -> int:
+    """按用户订阅的 OpenAlex Source（会议/ proceedings）分别抓取。"""
+    if not settings.openalex_enabled or not source_ids:
+        return 0
+    seen: set[str] = set()
+    total = 0
+    d = date.today() - timedelta(days=settings.openalex_lookback_days)
+    per = min(max(settings.openalex_subscription_per_source, 1), 200)
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
+    for raw in source_ids:
+        sid = normalize_openalex_source_id(raw)
+        if not sid or sid in seen:
+            continue
+        seen.add(sid)
+        fv = _normalize_openalex_source_filter_value(sid)
+        filt = ",".join(
+            [
+                "type:article",
+                f"from_publication_date:{d.isoformat()}",
+                "is_paratext:false",
+                f"primary_location.source.id:{fv}",
+            ]
+        )
+        params = {
+            "filter": filt,
+            "per_page": per,
+            "sort": "publication_date:desc",
+            "mailto": mailto,
+        }
+        try:
+            with httpx.Client(timeout=90.0, headers=headers) as client:
+                r = client.get(OPENALEX_WORKS, params=params)
+                r.raise_for_status()
+                data = r.json()
+            results = data.get("results") or []
+            total += _upsert_openalex_works_batch(db, results)
+        except Exception:
+            logger.warning("openalex subscription source fetch failed id=%s", sid, exc_info=True)
+    return total
+
+
 def _arxiv_abs_url(external_id: str) -> str | None:
-    # external_id like "arxiv:2301.12345" or legacy "arxiv:cs/0112017"
     if not external_id.startswith("arxiv:"):
         return None
     tail = external_id[6:].strip()

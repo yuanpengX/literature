@@ -19,7 +19,7 @@ from app.database import (
 import app.models  # noqa: F401 — 注册全部 ORM，供 create_all 建 fcm_tokens 等表
 from app.routers import daily_picks, devices, events, feed, papers, prefs, search, subscriptions
 from app.services.daily_picks import run_daily_picks_for_all_users
-from app.services.ingest import run_all_ingestion
+from app.services.ingest import run_ingestion_standalone
 from app.services.jobs import purge_old_events, purge_old_papers
 from app.config import settings
 from zoneinfo import ZoneInfo
@@ -30,14 +30,7 @@ _scheduler: BackgroundScheduler | None = None
 
 
 def _ingest_job() -> None:
-    db = SessionLocal()
-    try:
-        out = run_all_ingestion(db)
-        logger.info("ingestion %s", out)
-    except Exception:
-        logger.exception("ingestion failed")
-    finally:
-        db.close()
+    run_ingestion_standalone()
 
 
 def _daily_picks_job() -> None:
@@ -74,7 +67,13 @@ async def lifespan(app: FastAPI):
     await loop.run_in_executor(_executor, _ingest_job)
 
     _scheduler = BackgroundScheduler()
-    _scheduler.add_job(_ingest_job, "interval", hours=2, id="ingest", replace_existing=True)
+    _scheduler.add_job(
+        _ingest_job,
+        "interval",
+        hours=float(settings.ingest_interval_hours),
+        id="ingest",
+        replace_existing=True,
+    )
     _scheduler.add_job(_purge_job, "cron", hour=3, minute=10, id="purge", replace_existing=True)
     try:
         tz = ZoneInfo(settings.daily_picks_timezone)

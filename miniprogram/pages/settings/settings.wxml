@@ -1,0 +1,39 @@
+<scroll-view scroll-y class="page">
+  <view class="section">
+    <text class="h">文献服务器</text>
+    <text class="p">填写 API 根地址，勿带 /api/v1。留空则需在代码默认处修改。</text>
+    <input class="input" placeholder="https://你的主机:8000" value="{{apiBase}}" bindinput="onApiBase" />
+    <button class="btn" bindtap="applyApi">应用后端地址</button>
+    <text wx:if="{{apiHint}}" class="hint">{{apiHint}}</text>
+  </view>
+
+  <view class="section">
+    <text class="h">大模型（BYOK）</text>
+    <text class="p">Key 仅存本机；请求直连模型商，须在小程序后台配置合法域名。</text>
+    <picker mode="selector" range="{{providers}}" range-key="label" value="{{providerIndex}}" bindchange="onProvider">
+      <view class="picker">模型商：{{providers[providerIndex].label}}</view>
+    </picker>
+    <input class="input" placeholder="模型 ID" value="{{llmModel}}" bindinput="onModel" />
+    <input class="input" placeholder="自定义 Base URL（可选）" value="{{llmBase}}" bindinput="onLlmBase" />
+    <input class="input" password placeholder="API Key" value="{{llmKey}}" bindinput="onLlmKey" />
+    <button class="btn" bindtap="saveLlmLocal">保存模型配置（本机）</button>
+  </view>
+
+  <view class="section">
+    <text class="h">订阅与抓取</text>
+    <text class="p">关键词、期刊 RSS、会议 OpenAlex 源；与 Android 订阅页一致。</text>
+    <button class="btn" bindtap="goSub">打开订阅配置</button>
+  </view>
+
+  <view class="section">
+    <text class="h">每日精选（服务端 LLM）</text>
+    <text class="p">将本机 Key 同步到服务器供定时任务使用（仅可信自建服务）。</text>
+    <button class="btn" bindtap="syncLlmServer">同步 LLM 到服务器</button>
+    <button class="btn-light" bindtap="clearLlmServer">清除服务端 LLM</button>
+    <text wx:if="{{llmHint}}" class="hint">{{llmHint}}</text>
+  </view>
+
+  <view class="section">
+    <button class="btn-light" bindtap="goAbout">关于本应用</button>
+  </view>
+</scroll-view>

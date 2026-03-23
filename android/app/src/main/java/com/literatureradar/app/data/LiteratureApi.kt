@@ -55,4 +55,7 @@ interface LiteratureApi {
 
     @PUT("api/v1/users/me/subscriptions")
     suspend fun putMySubscriptions(@Body body: UserSubscriptionsJson): UserSubscriptionsJson
+
+    @GET("api/v1/users/me/subscriptions/fetch-now")
+    suspend fun requestSubscriptionFetch(): PreferencesOkJson
 }

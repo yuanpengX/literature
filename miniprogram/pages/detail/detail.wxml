@@ -1,0 +1,25 @@
+<view class="page">
+  <view wx:if="{{loading && !paper}}" class="center"><text>加载中…</text></view>
+  <view wx:elif="{{err && !paper}}" class="center"><text>{{err}}</text></view>
+  <scroll-view wx:else scroll-y class="scroll">
+    <view class="inner">
+      <view class="fav-row">
+        <button class="fav-btn" size="mini" bindtap="onFavoriteTap">{{isFavorite ? '★ 已收藏' : '☆ 收藏'}}</button>
+      </view>
+      <text class="title">{{paper.title}}</text>
+      <text class="sub">{{paper.source}} · {{paper.external_id}}</text>
+      <text wx:if="{{paper.citation_count > 0}}" class="cite">引用（OpenAlex）{{paper.citation_count}}</text>
+      <text class="sec-title">摘要</text>
+      <text class="body">{{paper.abstract}}</text>
+
+      <text class="sec-title">AI 要点（端上模型）</text>
+      <text class="hint">内容由大模型根据摘要生成；请在设置中配置自备 API Key 与合法域名。</text>
+      <text wx:if="{{aiError}}" class="err">{{aiError}}</text>
+      <text wx:if="{{aiSummary}}" class="body">{{aiSummary}}</text>
+      <button class="btn-outline" bindtap="genAi" loading="{{aiLoading}}" disabled="{{aiLoading}}">生成中文要点</button>
+
+      <button wx:if="{{paper.pdf_url}}" class="btn-main" bindtap="copyPdf">复制 PDF 链接</button>
+      <button wx:if="{{paper.html_url}}" class="btn-main" bindtap="copyHtml">复制网页链接</button>
+    </view>
+  </scroll-view>
+</view>

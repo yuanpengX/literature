@@ -1,0 +1,93 @@
+<view class="page">
+  <text class="intro">期刊支持目录或自定义 RSS；会议支持目录或 OpenAlex Source ID。保存后触发服务端抓取。</text>
+  <text wx:if="{{loadErr}}" class="err">{{loadErr}}</text>
+
+  <view class="tabs">
+    <view class="tab {{subTab===0?'on':''}}" data-i="0" bindtap="setTab">期刊</view>
+    <view class="tab {{subTab===1?'on':''}}" data-i="1" bindtap="setTab">会议</view>
+    <view class="tab {{subTab===2?'on':''}}" data-i="2" bindtap="setTab">关键词</view>
+  </view>
+
+  <!-- 期刊 -->
+  <view wx:if="{{subTab===0}}" class="panel">
+    <view class="row-btns">
+      <button size="mini" class="mini" bindtap="pickCatalogJournal" disabled="{{!catalog}}">目录</button>
+      <button size="mini" class="mini" bindtap="openMj">自定义RSS</button>
+    </view>
+    <block wx:for="{{journals}}" wx:key="id">
+      <view class="row">
+        <view class="col">
+          <text class="t">{{item._title}}</text>
+          <text class="s">{{item._sub}}</text>
+        </view>
+        <switch checked="{{item.enabled}}" data-i="{{index}}" bindchange="toggleJournal" />
+        <text class="del" data-i="{{index}}" bindtap="delJournal">删除</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- 会议 -->
+  <view wx:if="{{subTab===1}}" class="panel">
+    <view class="row-btns">
+      <button size="mini" class="mini" bindtap="pickCatalogConf" disabled="{{!catalog}}">目录</button>
+      <button size="mini" class="mini" bindtap="openMc">手动</button>
+    </view>
+    <block wx:for="{{conferences}}" wx:key="id">
+      <view class="row">
+        <view class="col">
+          <text class="t">{{item._title}}</text>
+          <text class="s" wx:if="{{item._oid}}">{{item._oid}}</text>
+        </view>
+        <switch checked="{{item.enabled}}" data-i="{{index}}" bindchange="toggleConf" />
+        <text class="del" data-i="{{index}}" bindtap="delConf">删除</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- 关键词 -->
+  <view wx:if="{{subTab===2}}" class="panel">
+    <view class="kw-add">
+      <input class="input" placeholder="新关键词" value="{{newKw}}" bindinput="onNewKw" />
+      <button size="mini" class="mini" bindtap="addKw">添加</button>
+    </view>
+    <block wx:for="{{keywords}}" wx:for-index="idx" wx:key="idx">
+      <view class="row">
+        <text class="t">{{item.text}}</text>
+        <switch checked="{{item.enabled}}" data-i="{{index}}" bindchange="toggleKw" />
+        <text class="del" data-i="{{index}}" bindtap="delKw">删除</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="footer">
+    <button class="btn-light" bindtap="restoreDefaults" disabled="{{!catalog}}">恢复推荐配置</button>
+    <button class="btn" bindtap="save" loading="{{saving}}">保存到服务器</button>
+    <text wx:if="{{hint}}" class="hint">{{hint}}</text>
+  </view>
+
+  <!-- 自定义期刊 -->
+  <view wx:if="{{showMj}}" class="mask" catchtouchmove="noop">
+    <view class="modal">
+      <text class="mt">自定义期刊（RSS）</text>
+      <input class="input" placeholder="显示名称" value="{{mjName}}" bindinput="eMjName" />
+      <input class="input" placeholder="https://…" value="{{mjRss}}" bindinput="eMjRss" />
+      <view class="modal-btns">
+        <button size="mini" bindtap="closeMj">取消</button>
+        <button size="mini" type="primary" bindtap="confirmMj">添加</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 手动会议 -->
+  <view wx:if="{{showMc}}" class="mask" catchtouchmove="noop">
+    <view class="modal">
+      <text class="mt">手动添加会议</text>
+      <input class="input" placeholder="显示名称（可选）" value="{{mcName}}" bindinput="eMcName" />
+      <input class="input" placeholder="OpenAlex Source ID" value="{{mcOid}}" bindinput="eMcOid" />
+      <view class="modal-btns">
+        <button size="mini" bindtap="closeMc">取消</button>
+        <button size="mini" type="primary" bindtap="confirmMc">添加</button>
+      </view>
+    </view>
+  </view>
+</view>

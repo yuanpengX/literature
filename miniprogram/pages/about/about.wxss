@@ -1,0 +1,39 @@
+.page {
+  padding: 40rpx 32rpx;
+  min-height: 100vh;
+}
+
+.name {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+}
+
+.ver {
+  display: block;
+  font-size: 26rpx;
+  color: #49454F;
+  margin-bottom: 32rpx;
+}
+
+.body {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.6;
+  margin-bottom: 40rpx;
+}
+
+.h {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.link {
+  margin-bottom: 16rpx;
+  background: #E8DEF8;
+  color: #381E72;
+  border-radius: 24rpx;
+}

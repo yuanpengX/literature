@@ -1,0 +1,15 @@
+<view class="page">
+  <view wx:if="{{items.length === 0}}" class="empty">
+    暂无收藏
+    在论文详情页点击星标即可加入
+  </view>
+  <view wx:else class="list">
+    <paper-card
+      wx:for="{{items}}"
+      wx:key="id"
+      paper="{{item}}"
+      position="{{index}}"
+      bind:open="onOpenPaper"
+    />
+  </view>
+</view>

@@ -12,6 +12,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.catalog.presets import user_subscription_keywords_csv
 from app.config import settings
 from app.models import DailyPick, Paper, UserProfile
 from app.schemas import PaperOut
@@ -159,7 +160,8 @@ def generate_daily_pick_for_user(db: Session, user: UserProfile, pick_date: str 
             return
 
     merged = _merge_channel_candidates(db, settings.daily_picks_max_candidates * 2)
-    candidates = _filter_by_keywords(merged, user.keywords)
+    kcsv = user_subscription_keywords_csv(user)
+    candidates = _filter_by_keywords(merged, kcsv)
     if len(candidates) < 1:
         _upsert_daily_pick(
             db,
@@ -173,7 +175,7 @@ def generate_daily_pick_for_user(db: Session, user: UserProfile, pick_date: str 
         return
 
     valid_ids = {p.id for p in candidates}
-    prompt = _build_user_prompt(user.keywords, candidates)
+    prompt = _build_user_prompt(kcsv, candidates)
     try:
         raw = _call_user_llm(user.llm_base_url, user.llm_api_key, user.llm_model, prompt)
         ids, note = _parse_llm_choice_ids(raw, valid_ids)

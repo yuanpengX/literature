@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="form">
+    <input
+      class="input"
+      placeholder="关键词"
+      value="{{query}}"
+      bindinput="onQuery"
+    />
+    <button class="btn-search" bindtap="doSearch">搜索</button>
+  </view>
+  <text wx:if="{{searched && items.length === 0}}" class="hint">无结果，可换词重试。</text>
+  <view class="list">
+    <paper-card
+      wx:for="{{items}}"
+      wx:key="id"
+      paper="{{item}}"
+      position="{{index}}"
+      bind:open="onOpenPaper"
+    />
+  </view>
+</view>
