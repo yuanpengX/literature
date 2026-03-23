@@ -10,6 +10,7 @@
 4. **文献 API 默认地址**：与 Android `res/values/strings.xml` 中 `api_base_url` 一致，内置在 `utils/api.js` 的 `DEFAULT_BASE_URL`；设置里留空即使用该默认（与 APK 未改「应用后端地址」时行为一致）。填写时**不要**带 `/api/v1`。
 5. **request 合法域名**：在微信公众平台为小程序配置你的 **文献 API 域名**（HTTPS）。开发阶段可在开发者工具勾选「不校验合法域名」。
 6. **若订阅页等出现 `request:fail`**：多为真机/预览校验域名或禁止使用纯 HTTP。生产请使用 **HTTPS 默认端口 443**（`docker-compose.https-stack.yml`），在公众平台配置 request 域名（勿带非标准端口）；本地可 `http://局域网IP`（配合根目录 compose 映射的 **80**）并仅在开发者工具勾选「不校验合法域名」。
+7. **开发者工具 Network 里 `feed` / `fetch-now` 显示 (failed)、Size 0 B**：表示请求未拿到 HTTP 响应（被微信拦截、TLS/证书失败或连不上服务器）。请打开该请求的 **Headers** 或控制台里的 **`errMsg`**；常见处理：勾选「详情 → 本地设置 → 不校验合法域名…」、在公众平台补全 request 域名、用浏览器访问 `https://你的域名/health` 确认服务与证书。更新后的 `utils/api.js` 会在 `fail` 回调里拼接更具体的中文提示。
 
 ## 微信登录与用户隔离
 

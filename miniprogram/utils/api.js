@@ -188,6 +188,30 @@ function joinLiteratureApiUrl(base, path) {
   return b + p
 }
 
+/** 微信常见拦截文案 → 可操作的排查提示（与 Network 里 0 B / failed 对应） */
+function wxRequestFailHints(errMsg, fullUrl) {
+  const s = String(errMsg || '')
+  const parts = []
+  if (/domain list|合法域名|url not in domain|不在以下 request/i.test(s)) {
+    parts.push(
+      '公众平台「开发 → 开发管理 → 服务器域名」将 ' +
+        (fullUrl ? String(fullUrl).replace(/^https?:\/\/([^/]+).*/i, '$1') : 'API 域名') +
+        ' 加入 request 合法域名',
+    )
+    parts.push('开发者工具：右上角「详情 → 本地设置」勾选「不校验合法域名、web-view（业务域名）、TLS 版本以及 HTTPS 证书」')
+  }
+  if (/ssl|certificate|证书|handshake|TLS|tls/i.test(s)) {
+    parts.push('检查服务器 HTTPS 证书是否完整、是否被系统信任（勿用自签证书在未勾选不校验的环境）')
+  }
+  if (/timeout|超时/i.test(s)) {
+    parts.push('若为推荐 Feed：服务端可能在同步生成多条中文摘要，可稍后重试或缩小 limit')
+  }
+  if (/^http:\/\//i.test(String(fullUrl || ''))) {
+    parts.push('真机与体验版必须使用 HTTPS（默认 443），勿用纯 HTTP')
+  }
+  return parts
+}
+
 /** OkHttp 风格：Failed to connect to host/ip:port — 斜杠是诊断格式，不是 URL 拼错 */
 function humanizeSystemConnectMsg(s) {
   const m = String(s).match(/Failed to connect to\s+([^/\s]+)\/([^:\s]+):(\d+)/i)
@@ -247,12 +271,13 @@ function request(path, method, data, retry401) {
         if (errno != null && String(errno) !== '') {
           msg += ' (errno:' + errno + ')'
         }
+        const hints = wxRequestFailHints(raw, url)
         if (raw.indexOf('fail') !== -1 || raw === 'request:fail') {
-          const parts = []
-          if (/^http:\/\//i.test(url)) parts.push('真机请使用 HTTPS 域名并在公众平台配置 request 合法域名')
-          parts.push('开发工具可开「不校验合法域名」')
-          parts.push('确认服务已启动且域名解析、防火墙正确')
-          msg += ' — ' + parts.join('；')
+          hints.push('确认 API 根地址在「设置」中为 https://你的域名（无 /api/v1 后缀）')
+          hints.push('确认服务器与防火墙已放行 443，本机可先用浏览器打开同域名 /health')
+        }
+        if (hints.length) {
+          msg += ' — ' + hints.join('；')
         }
         reject(new Error(msg))
       },
