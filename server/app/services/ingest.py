@@ -480,6 +480,10 @@ def run_ingestion_channel_slice(db: Session, channel: str | None) -> dict[str, i
     if ch == "conference":
         out["openalex_conference_new"] = fetch_and_upsert_openalex_conference_works(db)
         src_ids = collect_subscription_openalex_source_ids(db)
+        logger.info(
+            "ingestion conference slice subscription_openalex_source_ids=%s",
+            len(src_ids),
+        )
         out["openalex_subscription_sources"] = fetch_and_upsert_openalex_for_source_ids(db, src_ids)
         return out
     return run_all_ingestion(db)
@@ -487,9 +491,10 @@ def run_ingestion_channel_slice(db: Session, channel: str | None) -> dict[str, i
 
 def run_ingestion_standalone_for_channel(channel: str | None = None) -> None:
     db = SessionLocal()
+    logger.info("ingestion channel slice task started channel=%s", channel)
     try:
         out = run_ingestion_channel_slice(db, channel)
-        logger.info("ingestion channel=%s %s", channel, out)
+        logger.info("ingestion channel slice finished channel=%s result=%s", channel, out)
     except Exception:
         logger.exception("ingestion channel=%s failed", channel)
     finally:

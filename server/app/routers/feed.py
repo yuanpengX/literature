@@ -32,6 +32,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/feed", tags=["feed"])
 
 
+def _log_user_prefix(uid: str) -> str:
+    if not uid or uid == "anonymous":
+        return uid or "anonymous"
+    return uid[:20] + ("…" if len(uid) > 20 else "")
+
+
 def _bg_maybe_fetch_arxiv(user_id: str, keywords: list[str]) -> None:
     db = SessionLocal()
     try:
@@ -82,6 +88,15 @@ def get_feed(
     else:
         raise HTTPException(status_code=400, detail="channel 须为 arxiv、journal 或 conference")
 
+    logger.info(
+        "feed request user=%s sort=%s channel=%s limit=%s offset=%s",
+        _log_user_prefix(user_id),
+        sort,
+        ch,
+        limit,
+        offset,
+    )
+
     user = db.get(UserProfile, user_id)
     if user is None and user_id != "anonymous":
         d = default_subscription_fields()
@@ -120,6 +135,29 @@ def get_feed(
     papers = [p for p in filtered if paper_matches_feed_channel(p, ch)]
     ordered = papers_to_feed_items(papers, user, sort)
 
+    conf_in_merged = sum(
+        1 for p in merged if (p.source or "").startswith("openalex:conference")
+    )
+    conf_in_filtered = sum(
+        1 for p in filtered if (p.source or "").startswith("openalex:conference")
+    )
+    conf_in_channel = sum(
+        1 for p in papers if (p.source or "").startswith("openalex:conference")
+    )
+    logger.info(
+        "feed pool user=%s channel=%s merged_total=%s filtered=%s channel_papers=%s "
+        "ordered_out=%s conf_in_merged=%s conf_in_filtered=%s conf_in_channel=%s",
+        _log_user_prefix(user_id),
+        ch,
+        len(merged),
+        len(filtered),
+        len(papers),
+        len(ordered),
+        conf_in_merged,
+        conf_in_filtered,
+        conf_in_channel,
+    )
+
     blurbs_llm_ready = bool(
         user is not None
         and user_id != "anonymous"
@@ -129,6 +167,18 @@ def get_feed(
     )
 
     if not blurbs_llm_ready:
+        logger.info(
+            "feed response empty reason=no_llm user=%s channel=%s anonymous=%s "
+            "profile=%s has_base_url=%s has_api_key=%s has_model=%s strict_sub=%s",
+            _log_user_prefix(user_id),
+            ch,
+            user_id == "anonymous",
+            user is not None,
+            bool(user and (user.llm_base_url or "").strip()),
+            bool(user and (user.llm_api_key or "").strip()),
+            bool(user and (user.llm_model or "").strip()),
+            settings.feed_strict_subscription_filter,
+        )
         return FeedResponse(
             items=[],
             next_cursor=None,
@@ -149,26 +199,38 @@ def get_feed(
         wall_deadline_monotonic=wall_deadline,
     )
     elapsed = time.monotonic() - t0
+    next_cursor = str(next_idx) if next_idx < len(ordered) else None
+
     if elapsed >= 25.0:
         logger.warning(
-            "feed collect slow user=%s channel=%s limit=%s items=%s ordered=%s elapsed=%.2fs (LLM/摘要补全在请求内同步)",
-            user_id[:32] if user_id else "",
+            "feed collect slow user=%s channel=%s limit=%s page_items=%s ordered=%s next_idx=%s "
+            "next_cursor=%s incomplete=%s wall_s=%.1f elapsed=%.2fs",
+            _log_user_prefix(user_id),
             ch,
             limit,
             len(page),
             len(ordered),
+            next_idx,
+            next_cursor,
+            blurbs_generation_incomplete,
+            float(settings.feed_sync_wall_seconds),
             elapsed,
         )
     else:
         logger.info(
-            "feed collect ok user=%s channel=%s limit=%s items=%s elapsed=%.2fs",
-            user_id[:32] if user_id else "",
+            "feed collect done user=%s channel=%s limit=%s page_items=%s ordered=%s next_idx=%s "
+            "next_cursor=%s incomplete=%s wall_s=%.1f elapsed=%.2fs",
+            _log_user_prefix(user_id),
             ch,
             limit,
             len(page),
+            len(ordered),
+            next_idx,
+            next_cursor,
+            blurbs_generation_incomplete,
+            float(settings.feed_sync_wall_seconds),
             elapsed,
         )
-    next_cursor = str(next_idx) if next_idx < len(ordered) else None
 
     if blurbs_generation_incomplete and user_id != "anonymous":
         ordered_ids = [p.id for p in ordered]
@@ -178,6 +240,12 @@ def get_feed(
                 user_id,
                 ordered_ids,
                 next_idx,
+            )
+            logger.info(
+                "feed bg scheduled blurbs_continue user=%s from_idx=%s ordered_len=%s",
+                _log_user_prefix(user_id),
+                next_idx,
+                len(ordered_ids),
             )
 
     return FeedResponse(

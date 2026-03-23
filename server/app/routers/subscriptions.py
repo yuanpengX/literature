@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -33,6 +34,13 @@ from app.schemas import (
 )
 
 router = APIRouter(tags=["subscriptions"])
+logger = logging.getLogger(__name__)
+
+
+def _sub_log_user(uid: str) -> str:
+    if not uid or uid == "anonymous":
+        return uid or "anonymous"
+    return uid[:20] + ("…" if len(uid) > 20 else "")
 
 
 def _parse_keywords(json_str: str) -> list[SubscriptionKeywordItem]:
@@ -180,6 +188,13 @@ def get_subscription_fetch_now(
         background_tasks.add_task(run_ingestion_standalone)
     if user_id != "anonymous":
         background_tasks.add_task(prewarm_feed_blurbs_for_user_background, user_id)
+    logger.info(
+        "subscriptions fetch-now user=%s channel=%s full_ingest=%s prewarm_scheduled=%s",
+        _sub_log_user(user_id),
+        raw or "all",
+        not bool(raw),
+        user_id != "anonymous",
+    )
     return {"ok": True}
 
 

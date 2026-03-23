@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
@@ -26,6 +27,31 @@ from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=2)
+
+
+def configure_application_logging() -> None:
+    """
+    将 app.* 业务日志打到 stderr（Docker 默认可见），避免仅 Uvicorn access 无 Feed/ingest 细节。
+    """
+    app_root = logging.getLogger("app")
+    if getattr(app_root, "_literature_logging_configured", False):
+        return
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    app_root.addHandler(handler)
+    app_root.setLevel(logging.INFO)
+    # 处理完后不再冒泡到 root，避免与 Uvicorn 默认配置重复或级别不一致
+    app_root.propagate = False
+    # 降噪：HTTP 客户端 debug 勿刷屏
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    setattr(app_root, "_literature_logging_configured", True)
 _scheduler: BackgroundScheduler | None = None
 
 
@@ -66,8 +92,7 @@ def _purge_job() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _scheduler
-    # uvicorn 完成日志初始化后再调，否则 root 级别可能挡住 app 的 INFO
-    logging.getLogger("app").setLevel(logging.INFO)
+    configure_application_logging()
     Base.metadata.create_all(bind=engine)
     ensure_papers_schema(engine)
     ensure_user_llm_columns(engine)
