@@ -13,20 +13,27 @@ function stripHtmlToPlain(s) {
   return t.replace(/\s+/g, ' ').trim()
 }
 
-/** 与服务端 heuristic_feed_blurb_from_abstract 对齐，作客户端兜底 */
-function heuristicOneLineFromAbstract(abstractRaw, maxLen) {
-  const n = maxLen == null ? 88 : maxLen
+/** 与服务端 heuristic_feed_blurb_from_abstract 对齐：前几句摘要作卡片介绍 */
+function heuristicBlurbFromAbstract(abstractRaw, maxLen, maxSentences) {
+  const maxL = maxLen == null ? 420 : maxLen
+  const maxS = maxSentences == null ? 3 : maxSentences
   const plain = stripHtmlToPlain(abstractRaw || '')
   if (!plain) return ''
-  const seps = ['。', '！', '？', '.', '!', '?']
-  for (let i = 0; i < seps.length; i++) {
-    const idx = plain.indexOf(seps[i])
-    if (idx >= 8 && idx <= n + 40) {
-      return plain.slice(0, idx + 1).trim()
-    }
+  const chunks = plain.split(/(?<=[。！？.!?])\s+/)
+  const parts = chunks.map((c) => c.trim()).filter(Boolean)
+  if (!parts.length) return plain.length <= maxL ? plain : plain.slice(0, maxL - 1).trim() + '\u2026'
+  let out = ''
+  let count = 0
+  for (let i = 0; i < parts.length && count < maxS; i++) {
+    const p = parts[i]
+    const next = out + p
+    if (next.length > maxL && out) break
+    out = next
+    count += 1
+    if (out.length >= maxL) break
   }
-  if (plain.length <= n) return plain
-  return plain.slice(0, n - 1).trim() + '\u2026'
+  if (out.length > maxL) return out.slice(0, maxL - 1).trim() + '\u2026'
+  return out
 }
 
 function normalizedBlob(s) {
@@ -41,9 +48,10 @@ function isRedundantBlurb(blurb, abstractPlain) {
   const b = normalizedBlob(blurb)
   const a = normalizedBlob(abstractPlain)
   if (!b || !a) return false
+  if (b.length > 200) return false
   if (b === a) return true
   const head = a.slice(0, 120)
-  if (b.length >= 8 && head.startsWith(b)) return true
+  if (b.length >= 8 && head.indexOf(b) === 0) return true
   if (b.length >= 20 && a.startsWith(b) && a.length - b.length <= 24) return true
   if (a.length >= 20 && b.startsWith(a) && b.length - a.length <= 24) return true
   return false
@@ -51,6 +59,6 @@ function isRedundantBlurb(blurb, abstractPlain) {
 
 module.exports = {
   stripHtmlToPlain,
-  heuristicOneLineFromAbstract,
+  heuristicBlurbFromAbstract,
   isRedundantBlurb,
 }

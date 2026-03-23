@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.ServiceLocator
+import com.literatureradar.app.util.NetworkErrorHumanizer
 import com.literatureradar.app.data.AnalyticsEventJson
 import com.literatureradar.app.data.PaperJson
 import com.literatureradar.app.data.local.FavoriteEntity
@@ -96,7 +97,7 @@ fun PaperDetailScreen(
                 err = null
             }
             .onFailure { e ->
-                if (paper == null) err = e.message ?: "加载失败"
+                if (paper == null) err = NetworkErrorHumanizer.message(e)
             }
         loading = false
     }

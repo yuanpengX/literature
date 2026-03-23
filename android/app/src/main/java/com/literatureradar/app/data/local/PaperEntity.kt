@@ -21,5 +21,7 @@ data class PaperEntity(
     val citationCount: Int = 0,
     /** 与 API `feed_blurb` 对齐；供推荐列表一句话摘要缓存 */
     val feedBlurb: String = "",
+    /** 与 API `read_value_stars` 对齐 */
+    val readValueStars: Int = 3,
     val cachedAtMillis: Long,
 )

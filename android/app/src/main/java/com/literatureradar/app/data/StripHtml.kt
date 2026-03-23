@@ -19,12 +19,15 @@ fun String.stripHtmlToPlain(): String {
 private fun String.normalizedForCompare(): String =
     lowercase().replace(Regex("\\s+"), " ").trim()
 
-/** 一句话与摘要正文实质相同时不双显（与服务端一致） */
+/** 介绍文与摘要实质相同时不双显（与服务端一致；长文 LLM 介绍不做前缀误判） */
 fun feedBlurbRedundantWithAbstract(blurb: String, abstractPlain: String): Boolean {
     val b = blurb.normalizedForCompare()
     val a = abstractPlain.normalizedForCompare()
     if (b.isEmpty() || a.isEmpty()) return false
+    if (b.length > 200) return false
     if (b == a) return true
+    val head = a.take(120)
+    if (b.length >= 8 && head.startsWith(b)) return true
     if (b.length >= 20 && a.startsWith(b) && (a.length - b.length) <= 24) return true
     if (a.length >= 20 && b.startsWith(a) && (b.length - a.length) <= 24) return true
     return false

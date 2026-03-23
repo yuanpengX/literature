@@ -1,6 +1,6 @@
 const {
   stripHtmlToPlain,
-  heuristicOneLineFromAbstract,
+  heuristicBlurbFromAbstract,
   isRedundantBlurb,
 } = require('../../utils/textPlain.js')
 
@@ -35,8 +35,8 @@ Component({
   data: {
     tagChips: [],
     summaryLine: '',
-    abstractPlain: '',
-    hideAbstractDup: false,
+    starsFilled: '',
+    starsEmpty: '',
   },
   lifetimes: {
     attached() {
@@ -61,17 +61,21 @@ Component({
         : '') ||
         (p.feedBlurb != null && String(p.feedBlurb).trim() ? String(p.feedBlurb).trim() : '')
       if (!pickStr && !fb) {
-        fb = heuristicOneLineFromAbstract(p.abstract || '')
+        fb = heuristicBlurbFromAbstract(p.abstract || '')
       }
       const abstractPlain = stripHtmlToPlain((p && p.abstract) || '')
       let summary = pickStr || fb
       if (isRedundantBlurb(summary, abstractPlain)) {
         summary = ''
       }
+      const rawStars = p.read_value_stars != null ? p.read_value_stars : p.readValueStars
+      const n = rawStars != null && rawStars !== '' ? parseInt(rawStars, 10) : NaN
+      const starN = Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : 3
       this.setData({
         tagChips: buildTagChips(p),
         summaryLine: summary,
-        abstractPlain,
+        starsFilled: '\u2605'.repeat(starN),
+        starsEmpty: '\u2606'.repeat(5 - starN),
       })
     },
     onTap() {

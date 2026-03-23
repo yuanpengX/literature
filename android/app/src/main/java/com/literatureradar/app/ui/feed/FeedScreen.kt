@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.ServiceLocator
+import com.literatureradar.app.util.NetworkErrorHumanizer
 import com.literatureradar.app.data.AnalyticsEventJson
 import com.literatureradar.app.data.PaperJson
 import com.literatureradar.app.data.local.PaperEntity
@@ -161,7 +162,7 @@ fun FeedScreen(
             }
         }
         runCatching { refreshFirstPage() }
-            .onFailure { error = it.message ?: "加载失败" }
+            .onFailure { error = NetworkErrorHumanizer.message(it) }
         loading = false
     }
 
@@ -171,7 +172,7 @@ fun FeedScreen(
         error = null
         runCatching { ServiceLocator.api.requestSubscriptionFetch() }
         runCatching { refreshFirstPage() }
-            .onFailure { error = it.message }
+            .onFailure { error = NetworkErrorHumanizer.message(it) }
         refreshing = false
     }
 
@@ -220,7 +221,7 @@ fun FeedScreen(
                         error = null
                         runCatching { ServiceLocator.api.requestSubscriptionFetch() }
                         runCatching { refreshFirstPage() }
-                            .onFailure { error = it.message }
+                            .onFailure { error = NetworkErrorHumanizer.message(it) }
                         refreshing = false
                     }
                 },

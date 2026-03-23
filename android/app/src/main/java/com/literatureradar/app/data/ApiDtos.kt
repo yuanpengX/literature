@@ -33,6 +33,8 @@ data class PaperJson(
     @SerialName("rank_tags") val rankTags: List<String> = emptyList(),
     @SerialName("feed_blurb") val feedBlurb: String = "",
     @SerialName("citation_count") val citationCount: Int = 0,
+    /** 1～5：阅读价值星级（服务端按热度+相关性在列表内归一化） */
+    @SerialName("read_value_stars") val readValueStars: Int = 3,
 )
 
 @Serializable

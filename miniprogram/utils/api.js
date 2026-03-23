@@ -188,6 +188,25 @@ function joinLiteratureApiUrl(base, path) {
   return b + p
 }
 
+/** OkHttp 风格：Failed to connect to host/ip:port — 斜杠是诊断格式，不是 URL 拼错 */
+function humanizeSystemConnectMsg(s) {
+  const m = String(s).match(/Failed to connect to\s+([^/\s]+)\/([^:\s]+):(\d+)/i)
+  if (m) {
+    return (
+      '无法连接 ' +
+      m[1] +
+      '（HTTPS 端口 ' +
+      m[3] +
+      '）。「' +
+      m[1] +
+      '/' +
+      m[2] +
+      '」为系统显示的域名与解析 IP，并非把接口地址拼成「域名/IP」。请检查网络与 443 服务。'
+    )
+  }
+  return s
+}
+
 function request(path, method, data, retry401) {
   const base = getBaseUrl()
   if (!base) {
@@ -224,7 +243,7 @@ function request(path, method, data, retry401) {
       fail(err) {
         const raw = (err && err.errMsg) || '网络错误'
         const errno = err && err.errno
-        let msg = raw
+        let msg = humanizeSystemConnectMsg(raw)
         if (errno != null && String(errno) !== '') {
           msg += ' (errno:' + errno + ')'
         }

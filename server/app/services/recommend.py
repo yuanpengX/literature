@@ -41,6 +41,19 @@ def _norm(values: list[float]) -> list[float]:
     return [(v - lo) / (hi - lo) for v in values]
 
 
+def _combined_read_value_to_stars(x: float) -> int:
+    x = min(1.0, max(0.0, float(x)))
+    s = int(round(1.0 + 4.0 * x))
+    return min(5, max(1, s))
+
+
+def read_value_stars_for_isolated_paper(hot_score: float) -> int:
+    """单条详情等无 batch 归一化：热度粗映射 + 中性相关性。"""
+    h = min(1.0, max(0.0, float(hot_score) / 30.0))
+    x = 0.55 * h + 0.45 * 0.5
+    return _combined_read_value_to_stars(x)
+
+
 def _age_days(p: Paper, now: datetime) -> float | None:
     ref = p.published_at or p.ingested_at
     if ref is None:
@@ -57,8 +70,10 @@ def paper_to_out(
     *,
     rank_tags: list[RankTag] | None = None,
     feed_blurb: str = "",
+    read_value_stars: int = 3,
 ) -> PaperOut:
     abst = strip_html_to_plain(p.abstract)
+    rs = min(5, max(1, int(read_value_stars)))
     return PaperOut(
         id=p.id,
         external_id=p.external_id,
@@ -75,6 +90,7 @@ def paper_to_out(
         rank_reason=rank_reason,  # type: ignore[arg-type]
         rank_tags=list(rank_tags or []),
         feed_blurb=feed_blurb or "",
+        read_value_stars=rs,
     )
 
 
@@ -140,14 +156,16 @@ def papers_to_feed_items(
         hs = p.stats.hot_score if p.stats is not None else 0.0
         rr = None if sort_key == "recent" else reason
         tags: list[RankTag] = []
+        i = idx_by_id[p.id]
         if sort_key != "recent":
-            i = idx_by_id[p.id]
             if reason == "trending" or hot_n[i] >= hot_thr:
                 tags.append("trending")
             ad = _age_days(p, now)
             if ad is not None and ad <= fresh_days:
                 tags.append("fresh")
-        out.append(paper_to_out(p, rr, hs, rank_tags=tags))
+        # 阅读价值：热度 55% + 相关性 45%（与 for_you / recommended 信号一致）
+        rv = _combined_read_value_to_stars(0.55 * hot_n[i] + 0.45 * int_n[i])
+        out.append(paper_to_out(p, rr, hs, rank_tags=tags, read_value_stars=rv))
     return out
 
 

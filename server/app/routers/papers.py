@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.deps import get_db
 from app.models import Paper
 from app.schemas import PaperOut
+from app.services.recommend import read_value_stars_for_isolated_paper
 from app.services.text_plain import strip_html_to_plain
 
 router = APIRouter(prefix="/papers", tags=["papers"])
@@ -33,4 +34,5 @@ def get_paper(paper_id: int, db: Session = Depends(get_db)):
         rank_reason=None,
         rank_tags=[],
         feed_blurb="",
+        read_value_stars=read_value_stars_for_isolated_paper(hs),
     )

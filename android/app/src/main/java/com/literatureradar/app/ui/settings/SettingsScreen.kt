@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.R
+import com.literatureradar.app.util.NetworkErrorHumanizer
 import com.literatureradar.app.ServiceLocator
 import com.literatureradar.app.data.UserLlmCredentialsBody
 import com.literatureradar.app.data.llm.LlmPresets
@@ -232,7 +233,7 @@ fun SettingsScreen(
                             }.fold(
                                 onSuccess = { "已保存本机并已同步服务器（每日精选 + Feed 摘要）" },
                                 onFailure = { e ->
-                                    "已保存本机；同步服务器失败：${e.message ?: "未知错误"}（仍可点「同步 LLM 到服务器」重试）"
+                                    "已保存本机；同步服务器失败：${NetworkErrorHumanizer.message(e)}（仍可点「同步 LLM 到服务器」重试）"
                                 },
                             )
                             withContext(Dispatchers.Main) { llmHint = hint }
@@ -305,7 +306,7 @@ fun SettingsScreen(
                             }
                             .onFailure { e ->
                                 withContext(Dispatchers.Main) {
-                                    dailyLlmHint = e.message ?: "同步失败"
+                                    dailyLlmHint = NetworkErrorHumanizer.message(e)
                                 }
                             }
                     }

@@ -21,7 +21,16 @@ class PaperOut(BaseModel):
     hot_score: float = 0.0
     rank_reason: Literal["trending", "for_you", "recent"] | None = None
     rank_tags: list[RankTag] = Field(default_factory=list)
-    feed_blurb: str = Field(default="", description="Feed 一句话总结（用户 LLM 缓存）")
+    feed_blurb: str = Field(
+        default="",
+        description="Feed 中文介绍（用户 LLM 缓存，2～3 句结构化概述；无缓存时为摘要启发式）",
+    )
+    read_value_stars: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description="阅读价值星级（1～5）：由当前列表内热度与相关性归一化后综合得到",
+    )
 
     class Config:
         from_attributes = True

@@ -8,6 +8,9 @@
   </view>
   <text class="title">{{paper.title}}</text>
   <text wx:if="{{paper.authors_text}}" class="authors">{{paper.authors_text}}</text>
+  <view class="stars-row">
+    <text class="stars-label">阅读价值</text>
+    <text class="stars-core"><text class="star-on">{{starsFilled}}</text><text class="star-off">{{starsEmpty}}</text></text>
+  </view>
   <view wx:if="{{summaryLine}}" class="pick-blurb">{{summaryLine}}</view>
-  <text class="abstract">{{abstractPlain}}</text>
 </view>

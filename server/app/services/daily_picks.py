@@ -16,7 +16,7 @@ from app.catalog.presets import user_subscription_keywords_csv
 from app.config import settings
 from app.models import DailyPick, Paper, UserProfile
 from app.schemas import DailyPickItemOut, PaperOut
-from app.services.recommend import paper_to_out
+from app.services.recommend import paper_to_out, read_value_stars_for_isolated_paper
 from app.services.subscription_candidates import (
     filter_papers_by_user_subscriptions,
     merge_subscription_candidate_papers,
@@ -301,6 +301,13 @@ def load_daily_pick_items(
         if p is None:
             continue
         hs = p.stats.hot_score if p.stats is not None else 0.0
-        po = paper_to_out(p, "recent", hs, rank_tags=[], feed_blurb="")
+        po = paper_to_out(
+            p,
+            "recent",
+            hs,
+            rank_tags=[],
+            feed_blurb="",
+            read_value_stars=read_value_stars_for_isolated_paper(hs),
+        )
         ordered.append(DailyPickItemOut(paper=po, pick_blurb=blurbs.get(pid, "")))
     return ordered, row.curator_note or None, None

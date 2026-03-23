@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.ServiceLocator
+import com.literatureradar.app.util.NetworkErrorHumanizer
 import com.literatureradar.app.data.ConferencePresetJson
 import com.literatureradar.app.data.JournalPresetJson
 import com.literatureradar.app.data.SubscriptionCatalogJson
@@ -101,7 +102,7 @@ fun SubscriptionConfigScreen(
             conferenceItems.clear()
             conferenceItems.addAll(me.conferences)
         } catch (e: Exception) {
-            loadError = e.message ?: "加载失败"
+            loadError = NetworkErrorHumanizer.message(e)
         }
     }
 
@@ -168,7 +169,7 @@ fun SubscriptionConfigScreen(
                                     }
                                     .onFailure { e ->
                                         withContext(Dispatchers.Main) {
-                                            hint = e.message ?: "保存失败"
+                                            hint = NetworkErrorHumanizer.message(e)
                                         }
                                     }
                             }

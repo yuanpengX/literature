@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -14,7 +15,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.data.PaperJson
@@ -102,6 +102,34 @@ fun PaperCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "阅读价值",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val n = paper.readValueStars.coerceIn(1, 5)
+                    repeat(n) {
+                        Text(
+                            text = "★",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    repeat(5 - n) {
+                        Text(
+                            text = "☆",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                        )
+                    }
+                }
+            }
             val abstractPlain = paper.abstract.stripHtmlToPlain()
             val blurbRaw = pickBlurb?.takeIf { it.isNotBlank() } ?: paper.feedBlurb.takeIf { it.isNotBlank() }
             val blurbLine = blurbRaw?.takeIf { !feedBlurbRedundantWithAbstract(it, abstractPlain) }
@@ -113,19 +141,12 @@ fun PaperCard(
                 ) {
                     Text(
                         text = blurb,
-                        style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     )
                 }
             }
-            Text(
-                text = abstractPlain,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

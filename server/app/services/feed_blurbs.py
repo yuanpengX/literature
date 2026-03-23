@@ -21,7 +21,7 @@ from app.services.text_plain import (
 
 logger = logging.getLogger(__name__)
 
-BLURB_MAX = 120
+BLURB_MAX = 680
 BATCH_MAX = 10
 
 
@@ -42,13 +42,18 @@ def _call_llm_blurbs(
 ) -> dict[int, str]:
     if not papers:
         return {}
-    lines = ["请为下列论文各写一句中文内容总结（不超过80字），基于标题与摘要，不要编造。", ""]
+    lines = [
+        "请为下列每篇论文各写一段中文介绍，严格基于标题与摘要、不要编造。要求：",
+        "① 共 2～3 句；② 结构化：先背景/问题，再方法或要点，最后意义或结论（若无则省略末句）；",
+        "③ 总长每篇不超过 260 字；④ 使用简洁书面语。",
+        "",
+    ]
     for p in papers:
-        abst = strip_html_to_plain(p.abstract).replace("\n", " ")[:400]
+        abst = strip_html_to_plain(p.abstract).replace("\n", " ")[:650]
         lines.append(f"id={p.id} | {p.title}")
         lines.append(f"摘要：{abst}")
         lines.append("")
-    lines.append("仅输出 JSON：{\"items\":[{\"paper_id\":1,\"blurb\":\"...\"},...]}")
+    lines.append('仅输出 JSON：{"items":[{"paper_id":1,"blurb":"..."},...]}')
     user_prompt = "\n".join(lines)
     root = _normalize_llm_base(base_url)
     url = f"{root}/chat/completions"

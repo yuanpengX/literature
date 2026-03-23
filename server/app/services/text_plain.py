@@ -40,18 +40,32 @@ def strip_html_to_plain(s: str | None) -> str:
     return t
 
 
-def heuristic_feed_blurb_from_abstract(abstract_plain: str, *, max_len: int = 88) -> str:
-    """无 LLM 缓存时，用摘要首句/截断作为 Feed 一句话展示。"""
+def heuristic_feed_blurb_from_abstract(
+    abstract_plain: str,
+    *,
+    max_len: int = 420,
+    max_sentences: int = 3,
+) -> str:
+    """无 LLM 缓存时，取摘要前几句（至多 max_sentences）作卡片介绍。"""
     plain = strip_html_to_plain(abstract_plain)
     if not plain:
         return ""
-    for sep in ("。", "！", "？", ".", "!", "?"):
-        i = plain.find(sep)
-        if 8 <= i <= max_len + 40:
-            return plain[: i + 1].strip()
-    if len(plain) <= max_len:
-        return plain
-    return plain[: max_len - 1].strip() + "…"
+    chunks = re.split(r"(?<=[。！？.!?])\s+", plain)
+    parts = [c.strip() for c in chunks if c.strip()]
+    if not parts:
+        return plain[:max_len] + ("…" if len(plain) > max_len else "")
+    out_parts: list[str] = []
+    total = 0
+    for p in parts[:max_sentences]:
+        sep_len = 1 if out_parts else 0
+        if total + sep_len + len(p) > max_len and out_parts:
+            break
+        out_parts.append(p)
+        total += sep_len + len(p)
+    out = "".join(out_parts)
+    if len(out) > max_len:
+        out = out[: max_len - 1].strip() + "…"
+    return out
 
 
 def _is_metadata_only_plain(plain: str) -> bool:
@@ -148,6 +162,9 @@ def feed_blurb_redundant_with_abstract(blurb: str | None, abstract: str | None) 
     b = normalized_plain_blob(blurb)
     a = normalized_plain_blob(abstract)
     if not b or not a:
+        return False
+    # 长文介绍（多句 LLM）不再与摘要做「前缀重复」判定，避免误清空
+    if len(b) > 200:
         return False
     if b == a:
         return True
