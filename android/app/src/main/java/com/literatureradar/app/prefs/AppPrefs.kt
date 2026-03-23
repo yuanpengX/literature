@@ -12,7 +12,7 @@ object AppPrefs {
 
     /**
      * Retrofit 接口路径已带 `api/v1/...`。
-     * 若用户填写 `http://host:8000/api/v1`，会变成 `.../api/v1/api/v1/...` 导致 404。
+     * 若用户填写 `http://host/api/v1`（根地址已含路径），会变成 `.../api/v1/api/v1/...` 导致 404。
      */
     fun normalizeApiBaseUrl(raw: String): String {
         var u = raw.trim().trimEnd('/')

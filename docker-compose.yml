@@ -1,7 +1,8 @@
 # 文献雷达 API — Docker 部署（默认 SQLite 持久化到卷）
 # 使用：在项目根目录执行  docker compose up -d --build
 #
-# 生产对外仅 HTTPS、且不暴露宿主机 8000：见 docker-compose.https-stack.yml
+# 对外使用 HTTP 默认端口 80 → 容器内 API :8000（访问 http://<主机>/health ，勿写 :8000）
+# 生产 HTTPS（443）与域名证书：仅用 docker-compose.https-stack.yml（Caddy 反代，不暴露宿主机非标准端口）
 #
 # 腾讯云 CVM：宿主机建议配置 Docker 镜像加速（拉 python 等基础镜像更快）
 #   /etc/docker/daemon.json → "registry-mirrors": ["https://mirror.ccs.tencentyun.com"]
@@ -20,7 +21,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "80:8000"
     environment:
       DATABASE_URL: "sqlite:////data/literature.db"
       TZ: Asia/Shanghai
@@ -37,26 +38,5 @@ services:
       - literature_data:/data
     restart: unless-stopped
 
-  # HTTPS（兼容 profile）：需 deploy/https.env 含 LITERATURE_DOMAIN、ACME_EMAIL
-  # 生产推荐：docker-compose.https-stack.yml（API 不映射 8000）
-  caddy:
-    image: caddy:2-alpine
-    profiles:
-      - https
-    ports:
-      - "80:80"
-      - "443:443"
-    env_file:
-      - deploy/https.env
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - literature-api
-    restart: unless-stopped
-
 volumes:
   literature_data:
-  caddy_data:
-  caddy_config:

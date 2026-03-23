@@ -1,4 +1,4 @@
-# 对外仅通过 HTTPS 暴露 API（Caddy 终止 TLS，API 不映射宿主机 8000）
+# 对外仅通过 HTTPS 默认端口 443（及 80）暴露 API；容器内 API 仍为 :8000，由 Caddy 反代
 #
 # 前置：域名解析到本机公网 IP；安全组放行 TCP 80、443
 # 1. cp deploy/https.env.example deploy/https.env
@@ -9,7 +9,7 @@
 # 验证：curl https://cppteam.cn/health（域名以 deploy/https.env 为准）
 # 小程序 / Android：API 根地址为 https://<LITERATURE_DOMAIN>（无尾斜杠、无 /api/v1）
 #
-# 本地开发仍可用根目录 docker-compose.yml（直连 :8000）
+# 本地 HTTP：根目录 docker-compose.yml 将宿主机 80 映射到 API（http://localhost/health）
 
 services:
   literature-api:

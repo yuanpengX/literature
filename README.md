@@ -25,7 +25,7 @@ Monorepo：**Android 客户端** + **FastAPI 后端**。当前已实现：arXiv 
 
 ### 生产：对外仅 HTTPS（推荐）
 
-真机小程序、正式版客户端要求 **HTTPS** 与**已备案**（如适用）的合法域名。请使用专用编排 **[`docker-compose.https-stack.yml`](docker-compose.https-stack.yml)**：API 容器**不**映射宿主机 `8000`，仅由 **Caddy** 在 **80/443** 终止 TLS 并反代到 `literature-api:8000`。
+真机小程序、正式版客户端要求 **HTTPS（默认 443）** 与**已备案**（如适用）的合法域名。请使用 **[`docker-compose.https-stack.yml`](docker-compose.https-stack.yml)**：**Caddy** 占用宿主机 **80 / 443**，反代到容器内 `literature-api:8000`（不在宿主机暴露 `:8000`）。
 
 **前置条件**
 
@@ -44,14 +44,14 @@ cp server/.env.example server/.env   # 按需填写密钥等
 docker compose -f docker-compose.https-stack.yml up -d --build
 ```
 
-- 对外根地址：`https://<LITERATURE_DOMAIN>`（例如 `https://cppteam.cn/health`）
+- 对外根地址：`https://<LITERATURE_DOMAIN>`（**443**，勿写端口；例 `https://cppteam.cn/health`）
 - 客户端：将 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 的 `DEFAULT_BASE_URL` 与 [`android/.../strings.xml`](android/app/src/main/res/values/strings.xml) 的 `api_base_url` 设为同一 **https 根地址**（无尾斜杠、无 `/api/v1`）
 - 微信公众平台 → **服务器域名** → request 合法域名填你的 **https 域名**（不要带路径）
 - 从旧部署升级时：若仅有 `LITERATURE_DOMAIN`，请在 `https.env` 中**补充** `ACME_EMAIL`
 
 **说明**：[`deploy/Caddyfile`](deploy/Caddyfile) 使用全局 `email` 与站点反代；API 镜像内 **uvicorn** 已加 `--proxy-headers`，以便正确识别 `X-Forwarded-Proto` 等。若 Let’s Encrypt 不可用，可自行改写 `deploy/Caddyfile` 使用 `tls` 挂载云厂商证书（见 Caddy 文档）。
 
-### 本地 / 内网：直连 API 端口
+### 本地 / 内网：HTTP 默认端口 80
 
 在项目根目录：
 
@@ -59,15 +59,13 @@ docker compose -f docker-compose.https-stack.yml up -d --build
 docker compose up -d --build
 ```
 
-- 接口地址：`http://<主机IP>:8000`
-- 健康检查：`GET /health`
+- 接口根地址：`http://<主机IP>/`（**80**，勿写 `:8000`；容器内仍为 `:8000`，由 Compose 映射）
+- 健康检查：`GET http://<主机IP>/health`
 - 数据：`SQLite` 在卷 **`literature_data`** → `/data/literature.db`
 
 可选环境变量：复制 [`server/.env.example`](server/.env.example) 为 `server/.env`。
 
-### 兼容：根目录 Compose + `--profile https`
-
-仍可使用 [`docker-compose.yml`](docker-compose.yml) 的 **`caddy` 服务（`--profile https`）**，此时 API 的 **8000** 仍会映射到宿主机；适合过渡期。生产上更推荐 **`docker-compose.https-stack.yml`** 以避免对外暴露 8000。
+**HTTPS** 请只用 [`docker-compose.https-stack.yml`](docker-compose.https-stack.yml），避免与根目录 compose 争抢宿主机 **80**（二者勿同时占用同一台机的 80）。
 
 停止并删除容器（保留数据卷）：
 
@@ -94,7 +92,9 @@ cd server
 python3.12 -m venv .venv
 .venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 cp .env.example .env
-.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 与 Docker 一致使用 HTTP 默认端口（Linux 绑定 80 常需 root）：
+sudo .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 80
+# 若不便使用 80，可改用任意端口（如 8000），访问时须写全 URL：http://127.0.0.1:8000
 ```
 
 主要 API：
@@ -112,8 +112,8 @@ cp .env.example .env
 
 用 **Android Studio** 打开 `android` 目录同步工程。
 
-- **模拟器**连本机 `docker compose`（仅映射 8000）：`api_base_url` 可用 `http://10.0.2.2:8000`。
-- **真机 / 正式版**：与小程序一致，使用 **HTTPS API 根地址**（部署见上文 `docker-compose.https-stack.yml`）；纯内网调试时再改用 `http://<局域网IP>:8000` 并放行 **8000**。
+- **模拟器**连本机根目录 `docker compose`（宿主机 **80**）：Debug 默认 `http://10.0.2.2`（见 `src/debug/res/values/strings.xml`）。
+- **真机 / 正式版**：与小程序一致，使用 **HTTPS 根地址**（**443**，勿写端口）；纯内网 HTTP 调试用 `http://<局域网IP>` 并放行 **80**。
 
 ---
 

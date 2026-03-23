@@ -95,7 +95,7 @@ fun SettingsScreen(
         ) {
             Text("文献服务器", style = MaterialTheme.typography.titleMedium)
             Text(
-                "填写服务根地址，例如 http://主机:8000；勿以 / 结尾，也不要带 /api/v1（接口路径里已含）。修改后点「应用」。",
+                "填写服务根地址，例如 https://你的域名 或 http://10.0.2.2（默认端口勿写 :443/:80）；勿以 / 结尾，也不要带 /api/v1。修改后点「应用」。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

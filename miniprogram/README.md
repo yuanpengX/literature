@@ -9,7 +9,7 @@
 3. `project.config.json` 中 `appid` 可暂用测试号；正式发布需替换为你的小程序 AppID。
 4. **文献 API 默认地址**：与 Android `res/values/strings.xml` 中 `api_base_url` 一致，内置在 `utils/api.js` 的 `DEFAULT_BASE_URL`；设置里留空即使用该默认（与 APK 未改「应用后端地址」时行为一致）。填写时**不要**带 `/api/v1`。
 5. **request 合法域名**：在微信公众平台为小程序配置你的 **文献 API 域名**（HTTPS）。开发阶段可在开发者工具勾选「不校验合法域名」。
-6. **若订阅页等出现 `request:fail`**：多为真机/预览校验域名或禁止使用纯 HTTP。生产请使用 **HTTPS**（见仓库根目录 `docker-compose.https-stack.yml` 与 `README.md`），在公众平台「开发 → 开发管理 → 服务器域名」添加 request 域名；本地调试可用 `http://IP:8000` 并仅在开发者工具勾选「不校验合法域名」。
+6. **若订阅页等出现 `request:fail`**：多为真机/预览校验域名或禁止使用纯 HTTP。生产请使用 **HTTPS 默认端口 443**（`docker-compose.https-stack.yml`），在公众平台配置 request 域名（勿带非标准端口）；本地可 `http://局域网IP`（配合根目录 compose 映射的 **80**）并仅在开发者工具勾选「不校验合法域名」。
 
 ## 微信登录与用户隔离
 
