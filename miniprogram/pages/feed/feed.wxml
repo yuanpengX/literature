@@ -40,8 +40,15 @@
     <text>{{error}}</text>
   </view>
   <view wx:elif="{{!loading && items.length === 0}}" class="empty">
-    <text class="empty-title">暂无推荐</text>
-    <text class="empty-desc">下拉可请求服务端抓取并刷新列表。</text>
+    <block wx:if="{{!blurbsLlmReady}}">
+      <text class="empty-title">请先配置大模型</text>
+      <text class="empty-desc">推荐只展示已生成「中文摘要（2～3 句）」的论文。请在「设置」填写接口地址、API Key 与模型并保存同步到服务器，然后下拉刷新。</text>
+    </block>
+    <block wx:else>
+      <text class="empty-title">暂无条目</text>
+      <text class="empty-desc">当前频道下还没有带中文摘要的论文，或摘要仍在生成中。请稍后下拉刷新；也可在「订阅配置」调整关键词、期刊与会议后再下拉抓取。</text>
+      <text wx:if="{{channel === 'conference'}}" class="empty-hint">会议频道依赖 OpenAlex 会议数据；可在订阅中添加会议 Source ID。</text>
+    </block>
   </view>
 
   <view wx:else class="list-wrap">

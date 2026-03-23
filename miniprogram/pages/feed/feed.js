@@ -1,10 +1,5 @@
 const api = require('../../utils/api.js')
-const {
-  heuristicBlurbFromAbstract,
-  heuristicBlurbFromTitle,
-  isRedundantBlurb,
-  stripHtmlToPlain,
-} = require('../../utils/textPlain.js')
+// 推荐列表仅展示 API 返回的 feed_blurb（LLM），不在此用英文摘要兜底
 
 function matchesChannel(paper, ch) {
   const s = paper.source || ''
@@ -16,23 +11,15 @@ function matchesChannel(paper, ch) {
   return true
 }
 
-/** 规范化 API 字段并兜底一句话（避免组件 observer 未触发或旧接口缺 feed_blurb） */
+/** 规范化 API 字段；feed_blurb 仅用服务端 LLM 字段，不拼接英文摘要 */
 function normalizeFeedPaper(p) {
   if (!p || typeof p !== 'object') return p
   const fb0 = (p.feed_blurb || p.feedBlurb || '').trim()
-  let fb =
-    fb0 ||
-    heuristicBlurbFromAbstract(p.abstract || '') ||
-    heuristicBlurbFromTitle(p.title || '')
-  const abstPlain = stripHtmlToPlain(p.abstract || '')
-  if (isRedundantBlurb(fb, abstPlain)) {
-    fb = ''
-  }
   const rawStars = p.read_value_stars != null ? p.read_value_stars : p.readValueStars
   const rs = rawStars != null && rawStars !== '' ? parseInt(rawStars, 10) : NaN
   const readValueStars = Number.isFinite(rs) ? Math.min(5, Math.max(1, rs)) : 3
   return Object.assign({}, p, {
-    feed_blurb: fb,
+    feed_blurb: fb0,
     read_value_stars: readValueStars,
     authors_text: p.authors_text != null ? p.authors_text : p.authorsText || '',
     rank_tags: p.rank_tags != null ? p.rank_tags : p.rankTags || [],
@@ -49,6 +36,7 @@ Page({
     loadingMore: false,
     error: '',
     showBackTop: false,
+    blurbsLlmReady: false,
   },
 
   onLoad() {
@@ -61,14 +49,14 @@ Page({
   onChannel(e) {
     const ch = e.currentTarget.dataset.ch
     if (ch === this.data.channel) return
-    this.setData({ channel: ch, items: [], nextCursor: null, error: '' })
+    this.setData({ channel: ch, items: [], nextCursor: null, error: '', blurbsLlmReady: false })
     this.loadFirst(true)
   },
 
   onSort(e) {
     const s = e.currentTarget.dataset.sort
     if (!s || s === this.data.sort) return
-    this.setData({ sort: s, items: [], nextCursor: null, error: '' })
+    this.setData({ sort: s, items: [], nextCursor: null, error: '', blurbsLlmReady: false })
     this.loadFirst(true)
   },
 
@@ -80,9 +68,11 @@ Page({
       const items = raw
         .map(normalizeFeedPaper)
         .filter((p) => matchesChannel(p, this.data.channel))
+      const llmReady = !!(res.blurbs_llm_ready || res.blurbsLlmReady)
       this.setData({
         items,
         nextCursor: res.next_cursor || null,
+        blurbsLlmReady: llmReady,
         loading: false,
         error: '',
       })
@@ -125,9 +115,11 @@ Page({
         .map(normalizeFeedPaper)
         .filter((p) => matchesChannel(p, this.data.channel))
       const items = this.data.items.concat(page)
+      const llmReady = this.data.blurbsLlmReady || !!(res.blurbs_llm_ready || res.blurbsLlmReady)
       this.setData({
         items,
         nextCursor: res.next_cursor || null,
+        blurbsLlmReady: llmReady,
         loadingMore: false,
       })
     } catch (err) {

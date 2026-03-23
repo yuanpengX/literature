@@ -50,8 +50,10 @@ class Settings(BaseSettings):
     feed_abstract_enrich_max_per_request: int = 15  # 单次 Feed 最多尝试补全几条；FEED_ABSTRACT_ENRICH_MAX_PER_REQUEST
     abstract_enrich_http_timeout: float = 10.0  # ABSTRACT_ENRICH_HTTP_TIMEOUT
     # Feed：首屏同步调用用户 LLM 生成一句话（避免需刷新才出现）；余量仍走 BackgroundTasks
-    feed_llm_blurb_sync_max: int = 20  # FEED_LLM_BLURB_SYNC_MAX
+    feed_llm_blurb_sync_max: int = 20  # FEED_LLM_BLURB_SYNC_MAX（单批上限；确保每卡有摘要时多轮 batch 仍用 BATCH_MAX）
     feed_llm_http_timeout: float = 120.0  # 首屏同步生成 blurbs 时 LLM 超时（秒）；FEED_LLM_HTTP_TIMEOUT
+    # 从 ordered[offset] 起最多再扫描 limit*倍数 条候选，用于跳过暂无 LLM 缓存的论文
+    feed_llm_ensure_max_scan_multiplier: int = 40  # FEED_LLM_ENSURE_MAX_SCAN_MULTIPLIER
     # 每日精选（用户需主动同步 LLM 密钥到服务端；建议仅自建可信实例开启）
     daily_picks_hour: int = 6
     daily_picks_minute: int = 30

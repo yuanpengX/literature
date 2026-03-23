@@ -93,7 +93,7 @@ fun SettingsScreen(
         ) {
             Text("大模型（BYOK）", style = MaterialTheme.typography.titleMedium)
             Text(
-                "端上「生成中文要点」直连模型商。若要点「每日精选」与「推荐里的一句话摘要」走服务端，需在保存时把 Key 同步到你信任的文献服务器（见下方说明）。",
+                "端上「生成中文要点」直连模型商。若使用服务端「每日精选」与「推荐列表中文摘要（2～3 句）」，保存时需把 Key 同步到你信任的文献服务器（见下方说明）。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -229,9 +229,9 @@ fun SettingsScreen(
                 Text("打开订阅配置")
             }
 
-            Text("服务端 LLM（每日精选 / Feed 摘要）", style = MaterialTheme.typography.titleMedium)
+            Text("服务端 LLM（每日精选 / 推荐中文摘要）", style = MaterialTheme.typography.titleMedium)
             Text(
-                "保存模型配置时会尝试自动同步。也可手动点下面按钮。服务器用你的 Key 在定时任务中跑每日精选，并在你打开推荐列表时用后台任务补全「一句话摘要」。请勿在不信任的服务器上同步密钥。",
+                "保存模型配置时会尝试自动同步，也可点下面按钮手动同步。服务器用你的 Key 跑每日精选，并在你打开推荐时为列表中的论文生成「简体中文 2～3 句」摘要（无摘要的条目不会出现在推荐列表）。请勿在不信任的服务器上同步密钥。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

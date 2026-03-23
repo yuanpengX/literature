@@ -185,7 +185,7 @@ fun DailyPicksScreen(
                         if (items.isEmpty() && !loading) {
                             item {
                                 Text(
-                                    "暂无精选条目。同步 LLM 后等待定时任务，或点击上方按钮立即生成。",
+                                    "今日暂无精选条目。请先在「设置」同步大模型；精选仅展示带「中文 2～3 句」推荐理由的论文，可点击上方「立即生成」或等待定时任务。",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

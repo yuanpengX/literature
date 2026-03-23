@@ -23,7 +23,7 @@ class PaperOut(BaseModel):
     rank_tags: list[RankTag] = Field(default_factory=list)
     feed_blurb: str = Field(
         default="",
-        description="Feed 中文介绍（用户 LLM 缓存，2～3 句结构化概述；无缓存时为摘要启发式）",
+        description="Feed 中文介绍（用户 LLM 缓存；2～3 句；仅已配置 LLM 且成功写入时返回）",
     )
     read_value_stars: int = Field(
         default=3,
@@ -41,7 +41,7 @@ class FeedResponse(BaseModel):
     next_cursor: str | None = None
     blurbs_llm_ready: bool = Field(
         default=False,
-        description="服务端是否已保存该用户的 LLM（用于 Feed 后台个性化摘要；否则仅有摘要截断兜底）",
+        description="用户是否已配置 LLM；为 true 时 Feed 仅返回已生成中文摘要的条目",
     )
 
 

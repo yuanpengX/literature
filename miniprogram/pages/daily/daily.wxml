@@ -5,7 +5,7 @@
     <view class="meta" wx:if="{{pickDate}}">
       <text class="date">{{pickDate}}</text>
       <text wx:if="{{note}}" class="note">{{note}}</text>
-      <text wx:if="{{!serverLlm}}" class="warn">服务端未配置 LLM，精选可能为空或报错。</text>
+      <text wx:if="{{!serverLlm}}" class="warn">请先在「设置」同步大模型到服务器；精选条目需服务端生成「中文 2～3 句」推荐理由。</text>
       <view wx:if="{{subscriptionKeywords.length}}" class="kw-block">
         <text class="kw-title">已启用订阅关键词（与「设置 → 订阅配置」一致）</text>
         <view class="kw-tags">
@@ -17,7 +17,7 @@
     <view class="actions">
       <button class="btn-run" size="mini" bindtap="runNow" loading="{{runLoading}}">立即生成</button>
     </view>
-    <view wx:if="{{items.length === 0}}" class="empty">今日暂无精选条目</view>
+    <view wx:if="{{items.length === 0}}" class="empty">今日暂无精选（需已同步 LLM，且每条均有中文推荐理由）</view>
     <view class="list" wx:else>
       <paper-card
         wx:for="{{items}}"

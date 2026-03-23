@@ -98,6 +98,8 @@ fun FeedScreen(
     var loadingMore by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    /** 与 FeedResponse.blurbs_llm_ready 一致；未配置服务端 LLM 时为 false */
+    var blurbsLlmReady by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var showBackTop by remember { mutableStateOf(false) }
 
@@ -128,6 +130,7 @@ fun FeedScreen(
             sort = selectedSort.apiValue,
             channel = selectedChannel.apiValue,
         )
+        blurbsLlmReady = res.blurbsLlmReady
         items = res.items.filter { it.matchesChannel(selectedChannel) }
         nextCursor = res.nextCursor
         if (res.items.isNotEmpty()) {
@@ -148,6 +151,7 @@ fun FeedScreen(
                 sort = selectedSort.apiValue,
                 channel = selectedChannel.apiValue,
             )
+            blurbsLlmReady = blurbsLlmReady || res.blurbsLlmReady
             if (res.items.isEmpty()) {
                 nextCursor = res.nextCursor
                 return
@@ -167,6 +171,7 @@ fun FeedScreen(
         listState.scrollToItem(0, 0)
         error = null
         nextCursor = null
+        blurbsLlmReady = false
         withContext(Dispatchers.IO) {
             val cached = dao.listRecent(200).filter { it.matchesChannel(selectedChannel) }
             withContext(Dispatchers.Main) {
@@ -292,24 +297,34 @@ fun FeedScreen(
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
-                                    Text("暂无推荐", style = MaterialTheme.typography.titleMedium)
-                                    Text(
-                                        "当前频道下没有可展示的论文。下拉可请求服务端抓取并刷新列表。",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    if (selectedChannel == FeedChannel.Conference) {
+                                    if (!blurbsLlmReady) {
                                         Text(
-                                            "「会议」由 OpenAlex 会议/ proceedings 来源拉取；也可在订阅里填写会议 Source ID。下拉仅刷新会议抓取。",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            "请先配置大模型",
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        Text(
+                                            "推荐列表只展示已生成「中文摘要（2～3 句）」的论文。请在「设置」中填写模型接口地址、API Key 与模型 ID，保存以同步到服务器，然后下拉刷新本页。",
+                                            style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                    } else {
+                                        Text(
+                                            "暂无条目",
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        Text(
+                                            "当前频道下还没有带中文摘要的论文，或摘要仍在生成中。请稍后下拉刷新；也可在「订阅配置」中调整关键词、期刊与会议，再下拉触发抓取。",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        if (selectedChannel == FeedChannel.Conference) {
+                                            Text(
+                                                "会议频道依赖 OpenAlex 会议 / proceedings 数据；可在订阅中添加会议 Source ID。",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
-                                    Text(
-                                        "也可在浏览器访问：…/api/v1/feed?channel=${selectedChannel.apiValue}&limit=5 检查 items。",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
                                 }
                             }
                         }

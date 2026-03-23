@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 data class FeedResponseJson(
     val items: List<PaperJson> = emptyList(),
     @SerialName("next_cursor") val nextCursor: String? = null,
-    /** 服务端是否已保存 LLM；未同步时 Feed 仅摘要截断兜底，后台无法写个性化 blurbs */
+    /** 用户是否已在服务端配置 LLM；为 false 时推荐列表不返回条目 */
     @SerialName("blurbs_llm_ready") val blurbsLlmReady: Boolean = false,
 )
 

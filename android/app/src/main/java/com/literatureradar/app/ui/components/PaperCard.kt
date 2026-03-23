@@ -18,8 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.data.PaperJson
-import com.literatureradar.app.data.feedBlurbRedundantWithAbstract
-import com.literatureradar.app.data.stripHtmlToPlain
 
 @Composable
 fun PaperCard(
@@ -27,7 +25,7 @@ fun PaperCard(
     position: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    /** 每日精选等场景：展示一句推荐理由 */
+    /** 每日精选 LLM 推荐语；推荐列表用 [PaperJson.feedBlurb]；卡片不展示英文摘要。 */
     pickBlurb: String? = null,
 ) {
     Card(
@@ -130,10 +128,8 @@ fun PaperCard(
                     }
                 }
             }
-            val abstractPlain = paper.abstract.stripHtmlToPlain()
-            val blurbRaw = pickBlurb?.takeIf { it.isNotBlank() } ?: paper.feedBlurb.takeIf { it.isNotBlank() }
-            val blurbLine = blurbRaw?.takeIf { !feedBlurbRedundantWithAbstract(it, abstractPlain) }
-            blurbLine?.let { blurb ->
+            val llmBlurb = pickBlurb?.takeIf { it.isNotBlank() } ?: paper.feedBlurb.takeIf { it.isNotBlank() }
+            llmBlurb?.let { blurb ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),

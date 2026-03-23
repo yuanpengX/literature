@@ -1,8 +1,4 @@
-const {
-  stripHtmlToPlain,
-  heuristicBlurbFromAbstract,
-  isRedundantBlurb,
-} = require('../../utils/textPlain.js')
+// 卡片仅展示服务端 LLM（feed_blurb / pick_blurb），不用英文摘要启发式
 
 function buildTagChips(p) {
   const tags = (p && p.rank_tags) || (p && p.rankTags) || []
@@ -56,18 +52,11 @@ Component({
       const p = this.properties.paper || {}
       const pickRaw = this.properties.pickBlurb
       const pickStr = pickRaw != null && String(pickRaw).trim() ? String(pickRaw).trim() : ''
-      let fb = (p.feed_blurb != null && String(p.feed_blurb).trim()
+      const fb = (p.feed_blurb != null && String(p.feed_blurb).trim()
         ? String(p.feed_blurb).trim()
         : '') ||
         (p.feedBlurb != null && String(p.feedBlurb).trim() ? String(p.feedBlurb).trim() : '')
-      if (!pickStr && !fb) {
-        fb = heuristicBlurbFromAbstract(p.abstract || '')
-      }
-      const abstractPlain = stripHtmlToPlain((p && p.abstract) || '')
-      let summary = pickStr || fb
-      if (isRedundantBlurb(summary, abstractPlain)) {
-        summary = ''
-      }
+      const summary = pickStr || fb
       const rawStars = p.read_value_stars != null ? p.read_value_stars : p.readValueStars
       const n = rawStars != null && rawStars !== '' ? parseInt(rawStars, 10) : NaN
       const starN = Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : 3

@@ -13,12 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Paper, PaperUserBlurb, UserProfile
-from app.services.text_plain import (
-    feed_blurb_redundant_with_abstract,
-    heuristic_feed_blurb_from_abstract,
-    heuristic_feed_blurb_from_title,
-    strip_html_to_plain,
-)
+from app.services.abstract_enrich import enrich_papers_for_feed_ids, refresh_feed_items_abstracts
+from app.services.text_plain import strip_html_to_plain
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +40,10 @@ def _call_llm_blurbs(
     if not papers:
         return {}
     lines = [
-        "请为下列每篇论文各写一段中文介绍，严格基于标题与摘要、不要编造。要求：",
-        "① 共 2～3 句；② 结构化：先背景/问题，再方法或要点，最后意义或结论（若无则省略末句）；",
-        "③ 总长每篇不超过 260 字；④ 使用简洁书面语。",
+        "请为下列每篇论文各写一段「简体中文」介绍，严格基于标题与摘要、不要编造。要求：",
+        "① 必须使用简体中文（专有名词可保留英文）；禁止整段只用英文。",
+        "② 固定为 2～3 个完整句子，用句号「。」分隔；结构：背景/问题 → 方法或要点 → 意义或结论（末句可省略）。",
+        "③ 总长每篇不超过 260 字；④ 使用简洁书面语，勿用项目符号或编号列表。",
         "",
     ]
     for p in papers:
@@ -66,7 +63,7 @@ def _call_llm_blurbs(
         "messages": [
             {
                 "role": "system",
-                "content": "只输出单个 JSON 对象，不要 markdown。",
+                "content": "你是学术文献编辑。blurb 必须为简体中文 2～3 句。只输出单个 JSON 对象，不要 markdown。",
             },
             {"role": "user", "content": user_prompt},
         ],
@@ -124,22 +121,99 @@ def load_blurbs_for_papers(db: Session, user_id: str, paper_ids: list[int]) -> d
     return {r.paper_id: (r.blurb or "").strip() for r in rows if (r.blurb or "").strip()}
 
 
+def ensure_blurbs_for_user_papers(
+    db: Session,
+    user_id: str,
+    paper_ids: list[int],
+    *,
+    max_rounds: int = 48,
+    batch_size: int = BATCH_MAX,
+) -> None:
+    """
+    同步多轮调用 LLM，尽力为 paper_ids 中缺失的条目写入 blurb（每轮最多 batch_size 篇）。
+    """
+    if not paper_ids or user_id in ("", "anonymous"):
+        return
+    user = db.get(UserProfile, user_id)
+    if (
+        user is None
+        or not (user.llm_api_key or "").strip()
+        or not (user.llm_base_url or "").strip()
+        or not (user.llm_model or "").strip()
+    ):
+        return
+    stagnant = 0
+    for _ in range(max_rounds):
+        existing = load_blurbs_for_papers(db, user_id, paper_ids)
+        missing = [pid for pid in paper_ids if pid not in existing]
+        if not missing:
+            return
+        n = generate_missing_blurbs_for_user(db, user_id, missing, max_papers=batch_size)
+        if n <= 0:
+            stagnant += 1
+            if stagnant >= 4:
+                return
+        else:
+            stagnant = 0
+
+
+def collect_feed_items_with_blurbs(
+    db: Session,
+    user_id: str,
+    ordered: list,
+    offset: int,
+    limit: int,
+    *,
+    abstract_enrich_enabled: bool,
+    max_scan_multiplier: int,
+) -> tuple[list, int]:
+    """
+    从 ordered 中自 offset 起顺序扫描，同步补全 LLM 摘要，直到凑满 limit 条均有非空 feed_blurb，
+    或超出扫描窗口/候选耗尽。返回 (items, next_index)。
+    """
+    out: list = []
+    idx = max(0, int(offset))
+    mult = max(1, int(max_scan_multiplier))
+    max_scan = min(len(ordered), idx + max(limit * mult, limit + 5))
+
+    while len(out) < limit and idx < max_scan:
+        batch_end = min(idx + BATCH_MAX, len(ordered))
+        batch = ordered[idx:batch_end]
+        if not batch:
+            break
+        ids = [it.id for it in batch]
+        if abstract_enrich_enabled:
+            enrich_papers_for_feed_ids(db, ids)
+            refresh_feed_items_abstracts(db, batch)
+        ensure_blurbs_for_user_papers(db, user_id, ids)
+        merge_blurbs_into_feed_items(db, user_id, batch)
+        advance = 0
+        filled_limit = False
+        for it in batch:
+            advance += 1
+            if (it.feed_blurb or "").strip():
+                out.append(it)
+                if len(out) >= limit:
+                    idx += advance
+                    filled_limit = True
+                    break
+        if filled_limit:
+            break
+        idx += len(batch)
+
+    return out, idx
+
+
 def merge_blurbs_into_feed_items(
     db: Session,
     user_id: str,
     items: list,  # list[PaperOut]
 ) -> None:
-    """就地设置 feed_blurb（Pydantic model_copy）。"""
+    """就地设置 feed_blurb：仅用户 LLM 缓存，列表卡片不展示英文摘要启发式。"""
     ids = [it.id for it in items]
     m = load_blurbs_for_papers(db, user_id, ids)
     for i, it in enumerate(items):
         b = (m.get(it.id, "") or "").strip()
-        if not b:
-            b = heuristic_feed_blurb_from_abstract(it.abstract)
-        if not b:
-            b = heuristic_feed_blurb_from_title(it.title)
-        if feed_blurb_redundant_with_abstract(b, it.abstract):
-            b = ""
         items[i] = it.model_copy(update={"feed_blurb": b})
 
 

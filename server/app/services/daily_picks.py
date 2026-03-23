@@ -25,7 +25,7 @@ from app.services.text_plain import strip_html_to_plain
 
 logger = logging.getLogger(__name__)
 
-BLURB_MAX_LEN = 100
+BLURB_MAX_LEN = 280
 
 
 def _pick_date_str() -> str:
@@ -66,7 +66,8 @@ def _build_user_prompt(keywords_csv: str, papers: list[Paper]) -> str:
     lines.append(
         "请从这些候选中选出至多 10 篇最值得该用户阅读的论文（可少于 10）。"
         "优先与关键词相关，并兼顾质量、新颖度与多样性。"
-        f"每一篇必须给一句中文推荐理由（不超过{BLURB_MAX_LEN}字），不要编造事实。"
+        f"每一篇必须给「简体中文」推荐理由，固定为 2～3 个完整句子（用句号分隔），"
+        f"总长不超过 {BLURB_MAX_LEN} 字；不要编造事实，专有名词可保留英文。"
     )
     lines.append(
         "仅输出一个 JSON 对象，不要 markdown 代码块。格式示例："
@@ -95,7 +96,7 @@ def _call_user_llm(base_url: str, api_key: str, model: str, user_prompt: str) ->
         "messages": [
             {
                 "role": "system",
-                "content": "你是学术文献策展助手。只输出单个 JSON 对象，含 picks 数组（paper_id、blurb）与可选 note，不要其它文字。",
+                "content": "你是学术文献策展助手。blurb 须为简体中文 2～3 句。只输出单个 JSON 对象，含 picks（paper_id、blurb）与可选 note。",
             },
             {"role": "user", "content": user_prompt},
         ],
@@ -132,7 +133,8 @@ def _parse_llm_daily_response(obj: dict, valid_ids: set[int]) -> tuple[list[tupl
             blurb = str(item.get("blurb") or item.get("why") or "").strip()
             if len(blurb) > BLURB_MAX_LEN:
                 blurb = blurb[: BLURB_MAX_LEN - 1] + "…"
-            out.append((pid, blurb))
+            if blurb:
+                out.append((pid, blurb))
             seen.add(pid)
             if len(out) >= 10:
                 break
@@ -150,7 +152,7 @@ def _parse_llm_daily_response(obj: dict, valid_ids: set[int]) -> tuple[list[tupl
             legacy.append(pid)
         if len(legacy) >= 10:
             break
-    return [(pid, "") for pid in legacy], note
+    return [], note
 
 
 def _stored_payload_from_pairs(pairs: list[tuple[int, str]]) -> str:
@@ -300,6 +302,9 @@ def load_daily_pick_items(
         p = by_id.get(pid)
         if p is None:
             continue
+        pb = (blurbs.get(pid, "") or "").strip()
+        if not pb:
+            continue
         hs = p.stats.hot_score if p.stats is not None else 0.0
         po = paper_to_out(
             p,
@@ -309,5 +314,5 @@ def load_daily_pick_items(
             feed_blurb="",
             read_value_stars=read_value_stars_for_isolated_paper(hs),
         )
-        ordered.append(DailyPickItemOut(paper=po, pick_blurb=blurbs.get(pid, "")))
+        ordered.append(DailyPickItemOut(paper=po, pick_blurb=pb))
     return ordered, row.curator_note or None, None
