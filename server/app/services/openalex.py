@@ -118,6 +118,7 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
             continue
         ext_id = f"openalex:{wid}"
         title = (w.get("title") or w.get("display_name") or "").strip() or "(no title)"
+        # OpenAlex 仅提供 abstract_inverted_index；不少出版社（含部分 Nature 子刊）在索引中无摘要
         abstract = _reconstruct_abstract(w.get("abstract_inverted_index"))
         cited = int(w.get("cited_by_count") or 0)
         published = _parse_publication_date(w.get("publication_date"))

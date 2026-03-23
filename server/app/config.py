@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./literature.db"
     arxiv_query: str = "cat:q-bio.* OR cat:cs.LG"
     arxiv_max_results: int = 30
+    # 用户打开 arXiv 频道时，按其订阅关键词调用 export.arxiv.org/api/query（需遵守 polite 限流）
+    arxiv_keyword_max_results: int = 40  # ARXIV_KEYWORD_MAX_RESULTS
+    arxiv_user_refresh_seconds: float = 600.0  # 同一用户两次关键词拉取最小间隔（秒）；ARXIV_USER_REFRESH_SECONDS
+    arxiv_keyword_max_terms: int = 12  # 拼 OR 查询时最多采用几条关键词；ARXIV_KEYWORD_MAX_TERMS
     rss_feeds: str = ""  # comma-separated URLs, optional
     # OpenAlex: https://docs.openalex.org — 需可访问 api.openalex.org
     openalex_enabled: bool = False

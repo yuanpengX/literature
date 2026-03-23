@@ -45,6 +45,24 @@ def heuristic_feed_blurb_from_abstract(abstract_plain: str, *, max_len: int = 88
     return plain[: max_len - 1].strip() + "…"
 
 
+def strip_rss_boilerplate_html(html: str | None) -> str:
+    """
+    Nature / Springer 等 RSS：content:encoded 首段 <p> 常为
+    「刊名, Published online: … doi:…」，真正可读摘要在同字段内、第一个 </p> 之后。
+    """
+    if not html or "</p>" not in html:
+        return html or ""
+    head, tail = html.split("</p>", 1)
+    head_plain = strip_html_to_plain(head + "</p>").lower()
+    tail = tail.strip()
+    if not tail:
+        return html
+    meta_hints = ("published online", "doi:10.", "doi:", "online publication")
+    if any(h in head_plain for h in meta_hints):
+        return tail
+    return html
+
+
 def _is_metadata_only_abstract(text: str) -> bool:
     """RSS 等场景：摘要仅为期刊卷期元信息、无正文摘要时返回 True。"""
     plain = strip_html_to_plain(text)
@@ -54,6 +72,12 @@ def _is_metadata_only_abstract(text: str) -> bool:
         return True
     if _METADATA_JOURNAL_LINE_RE.match(plain.strip()):
         return True
+    # Nature 系：整段只有刊名+Published online+doi、无正文句子
+    low = plain.casefold()
+    if "published online" in low and len(plain) < 320 and re.search(r"doi\s*:\s*10\.\d+", plain, re.I):
+        tail = plain.split("doi", 1)[-1]
+        if not _SENT_END_RE.search(tail):
+            return True
     if len(plain) < 30 and not _SENT_END_RE.search(plain):
         return True
     return False

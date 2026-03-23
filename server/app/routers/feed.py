@@ -3,11 +3,13 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.catalog.presets import user_subscription_keywords_list
 from app.config import settings
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
 from app.schemas import FeedResponse
 from app.services.feed_blurbs import generate_missing_blurbs_background, merge_blurbs_into_feed_items
+from app.services.ingest import maybe_fetch_arxiv_for_user_keywords
 from app.services.recommend import papers_to_feed_items
 from app.services.subscription_candidates import (
     filter_papers_by_user_subscriptions,
@@ -62,6 +64,11 @@ def get_feed(
         db.add(user)
         db.commit()
         db.refresh(user)
+
+    if ch == "arxiv" and user_id != "anonymous" and user is not None:
+        kws = user_subscription_keywords_list(user)
+        if kws:
+            maybe_fetch_arxiv_for_user_keywords(db, user_id, kws)
 
     merged = merge_subscription_candidate_papers(
         db,

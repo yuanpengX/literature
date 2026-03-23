@@ -170,11 +170,6 @@ def filter_papers_by_user_subscriptions(
 
     out: list[Paper] = []
     for p in papers:
-        # arXiv 条目无法用期刊 RSS / 会议规则命中；仅按关键词筛时容易整频道被滤空。
-        # strict=False（默认）时保留全部 arXiv，保证「arXiv」Tab 仍有流；strict=True 仍只保留订阅命中。
-        if not strict and (p.source or "") == "arxiv":
-            out.append(p)
-            continue
         if _keyword_hit(p, kws) or _journal_hit(p, netlocs) or _conference_hit(p, conf_needles):
             out.append(p)
     return out

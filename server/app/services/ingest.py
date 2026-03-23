@@ -1,6 +1,8 @@
 import hashlib
 import logging
 import re
+import threading
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -18,7 +20,11 @@ from app.config import settings
 from app.models import Paper, UserProfile
 from app.database import SessionLocal
 from app.services.author_format import format_author_line
-from app.services.text_plain import _is_metadata_only_abstract, strip_html_to_plain
+from app.services.text_plain import (
+    _is_metadata_only_abstract,
+    strip_html_to_plain,
+    strip_rss_boilerplate_html,
+)
 from app.services.openalex import (
     enrich_arxiv_citations,
     fetch_and_upsert_openalex,
@@ -31,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 ARXIV_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
+_arxiv_user_lock = threading.Lock()
+_arxiv_user_last_mono: dict[str, float] = {}
+
 
 def _arxiv_id_from_entry_id(entry_id: str) -> str:
     m = re.search(r"arxiv\.org/abs/([^?#]+)", entry_id, re.I)
@@ -39,19 +48,8 @@ def _arxiv_id_from_entry_id(entry_id: str) -> str:
     return f"arxiv:{entry_id[-32:]}"
 
 
-def fetch_and_upsert_arxiv(db: Session) -> int:
-    """Pull arXiv Atom API and upsert papers. Returns count of new rows."""
-    params = {
-        "search_query": settings.arxiv_query,
-        "sortBy": "submittedDate",
-        "max_results": settings.arxiv_max_results,
-    }
-    url = "https://export.arxiv.org/api/query"
-    with httpx.Client(timeout=60.0) as client:
-        r = client.get(url, params=params)
-        r.raise_for_status()
-        root = ET.fromstring(r.text)
-
+def _upsert_arxiv_atom_entries(db: Session, root: ET.Element) -> int:
+    """解析 arXiv Atom API 根节点并写入 papers，返回新增行数。"""
     count = 0
     for entry in root.findall("atom:entry", ARXIV_NS):
         id_el = entry.find("atom:id", ARXIV_NS)
@@ -116,6 +114,80 @@ def fetch_and_upsert_arxiv(db: Session) -> int:
             count += 1
     db.commit()
     return count
+
+
+def fetch_and_upsert_arxiv_search(db: Session, search_query: str, max_results: int) -> int:
+    """按任意 arXiv API search_query 拉取并 upsert；返回新增条数。"""
+    q = (search_query or "").strip()
+    if not q:
+        return 0
+    cap = min(max(1, max_results), 2000)
+    params = {
+        "search_query": q,
+        "sortBy": "submittedDate",
+        "max_results": cap,
+    }
+    url = "https://export.arxiv.org/api/query"
+    with httpx.Client(timeout=60.0) as client:
+        r = client.get(url, params=params)
+        r.raise_for_status()
+        root = ET.fromstring(r.text)
+    return _upsert_arxiv_atom_entries(db, root)
+
+
+def fetch_and_upsert_arxiv(db: Session) -> int:
+    """定时任务：全局 categories 查询（settings.arxiv_query）。"""
+    return fetch_and_upsert_arxiv_search(db, settings.arxiv_query, settings.arxiv_max_results)
+
+
+def _arxiv_normalize_keyword_phrase(raw: str) -> str:
+    s = (raw or "").strip().replace('"', " ").replace("\\", " ")
+    s = re.sub(r"\s+", " ", s).strip()
+    if len(s) < 2:
+        return ""
+    return s[:240]
+
+
+def build_arxiv_or_query_from_keywords(keywords: list[str]) -> str | None:
+    """多条订阅关键词 OR；每条用 all:\"phrase\" 在标题+摘要中检索。"""
+    max_terms = min(max(settings.arxiv_keyword_max_terms, 1), 20)
+    clauses: list[str] = []
+    for kw in keywords[:max_terms]:
+        phrase = _arxiv_normalize_keyword_phrase(kw)
+        if not phrase:
+            continue
+        clauses.append(f'all:"{phrase}"')
+    if not clauses:
+        return None
+    return " OR ".join(clauses)
+
+
+def maybe_fetch_arxiv_for_user_keywords(db: Session, user_id: str, keywords: list[str]) -> None:
+    """
+    用户拉取 arXiv 频道时调用：按关键词查询 arXiv API 并入库（带进程内节流，避免触达 polite 限流）。
+    """
+    if not keywords or not user_id or user_id == "anonymous":
+        return
+    q = build_arxiv_or_query_from_keywords(keywords)
+    if not q:
+        return
+    interval = max(30.0, float(settings.arxiv_user_refresh_seconds))
+    now = time.monotonic()
+    with _arxiv_user_lock:
+        last = _arxiv_user_last_mono.get(user_id, 0.0)
+        if now - last < interval:
+            return
+    try:
+        n = fetch_and_upsert_arxiv_search(
+            db,
+            q,
+            settings.arxiv_keyword_max_results,
+        )
+        with _arxiv_user_lock:
+            _arxiv_user_last_mono[user_id] = time.monotonic()
+        logger.info("arxiv keyword fetch user=%s new_rows=%s", user_id[:24], n)
+    except Exception:
+        logger.exception("arxiv keyword fetch failed user=%s", user_id[:24])
 
 
 def _parse_rss_date(entry) -> datetime | None:
@@ -200,17 +272,18 @@ def _rss_content_values(entry) -> list[str]:
 def _rss_best_summary(entry) -> str:
     """优先 summary/description；若为卷期元信息则尝试 content[0].value 等。"""
     raw_sum = entry.get("summary") or entry.get("description") or ""
+    raw_sum = strip_rss_boilerplate_html(str(raw_sum) if raw_sum else "")
     summary_plain = strip_html_to_plain(raw_sum)
     if summary_plain and not _is_metadata_only_abstract(summary_plain):
         return summary_plain
     for html in _rss_content_values(entry):
-        cplain = strip_html_to_plain(html)
+        cplain = strip_html_to_plain(strip_rss_boilerplate_html(html))
         if cplain and not _is_metadata_only_abstract(cplain):
             return cplain
     if summary_plain:
         return summary_plain
     for html in _rss_content_values(entry):
-        cplain = strip_html_to_plain(html)
+        cplain = strip_html_to_plain(strip_rss_boilerplate_html(html))
         if cplain:
             return cplain
     return ""
