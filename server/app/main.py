@@ -33,6 +33,13 @@ def _ingest_job() -> None:
     run_ingestion_standalone()
 
 
+def _ingest_startup_background() -> None:
+    """首启全量抓取耗时长，勿阻塞 lifespan，否则 Caddy 反代在窗口期内 connection refused → 502。"""
+    try:
+        _ingest_job()
+    except Exception:
+        logger.exception("startup ingestion failed")
+
 def _daily_picks_job() -> None:
     db = SessionLocal()
     try:
@@ -63,8 +70,8 @@ async def lifespan(app: FastAPI):
     ensure_papers_schema(engine)
     ensure_user_llm_columns(engine)
     ensure_user_subscription_columns(engine)
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(_executor, _ingest_job)
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(_executor, _ingest_startup_background)
 
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(

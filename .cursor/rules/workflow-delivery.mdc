@@ -31,6 +31,7 @@ docker compose -f docker-compose.https-stack.yml up -d --build
 ```
 
 - 若仅改 `server/.env`，通常需 **`--force-recreate literature-api`** 或上述 `--build` 后确保 API 容器已用新镜像/环境重启。
+- 若公网仍 **502** 且 Caddy 日志为 `connection refused` 到 API：多为 API 刚重启未监听；稍等或执行 **`docker compose -f docker-compose.https-stack.yml restart caddy`**。
 - 若使用仅 HTTP 的 `docker-compose.yml`，则对该文件执行等价的 `up -d --build`。
 
 **注意**：不要在规则或提交中写入真实 `.env` 密钥；Docker 说明仅涉及命令与文件名。
