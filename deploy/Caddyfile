@@ -1,11 +1,8 @@
-# 文献雷达 API — HTTPS 终止于 Caddy，反代到 literature-api:8000
-# LITERATURE_DOMAIN、ACME_EMAIL 来自 deploy/https.env（见 deploy/https.env.example）
+# 文献雷达 API — HTTPS 终止于 Caddy；证书路径由容器环境变量 CADDY_TLS_* 指定
+# 默认见 deploy/https.defaults.env；可被 deploy/https.env 覆盖
 
-{
-	email {$ACME_EMAIL}
-}
-
-{$LITERATURE_DOMAIN} {
+{$LITERATURE_DOMAIN}, www.{$LITERATURE_DOMAIN} {
+	tls {$CADDY_TLS_CERT} {$CADDY_TLS_KEY}
 	encode gzip zstd
 	reverse_proxy literature-api:8000
 }

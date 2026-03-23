@@ -27,7 +27,7 @@ alwaysApply: true
 本仓库常用 **HTTPS 栈**（根目录 `docker-compose.https-stack.yml`）。服务端代码或 `server/Dockerfile` / 依赖变更后，在**仓库根目录**执行：
 
 ```bash
-docker compose -f docker-compose.https-stack.yml up -d --build
+docker compose --env-file deploy/compose.https.env -f docker-compose.https-stack.yml up -d --build
 ```
 
 - 若仅改 `server/.env`，通常需 **`--force-recreate literature-api`** 或上述 `--build` 后确保 API 容器已用新镜像/环境重启。

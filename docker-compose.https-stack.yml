@@ -1,12 +1,15 @@
 # 对外仅通过 HTTPS 默认端口 443（及 80）暴露 API；容器内 API 仍为 :8000，由 Caddy 反代
 #
-# 前置：域名解析到本机公网 IP；阿里云安全组与轻量「防火墙」均放行 TCP 80、443
-# 1. cp deploy/https.env.example deploy/https.env
-# 2. 编辑 deploy/https.env：填写 LITERATURE_DOMAIN、ACME_EMAIL
-# 3. 复制 server/.env.example → server/.env 并配置密钥等
-# 4. 在项目根目录：docker compose -f docker-compose.https-stack.yml up -d --build
+# 前置：域名解析到本机；阿里云安全组与轻量「防火墙」均放行 TCP 80、443
+# 1. 证书：默认挂载 deploy/certs/（fullchain.pem + privkey.pem，见 deploy/certs/README.md）
+#    若阿里云部署到 /ssl：编辑 deploy/compose.https.env 设 CERT_HOST_DIR=/ssl，并在 deploy/https.env
+#    设置 CADDY_TLS_CERT=/etc/caddy/certs/cert.pem、CADDY_TLS_KEY=/etc/caddy/certs/cert.key（按实际文件名）
+# 2. 可选：cp deploy/https.env.example deploy/https.env 覆盖域名等（会覆盖 https.defaults.env）
+# 3. server/.env 配置密钥等
+# 4. 启动（推荐带 compose 变量文件，以便 CERT_HOST_DIR 生效）：
+#    docker compose --env-file deploy/compose.https.env -f docker-compose.https-stack.yml up -d --build
 #
-# 验证：curl https://<LITERATURE_DOMAIN>/health（域名以 deploy/https.env 为准；本仓库示例 IP 为 47.103.51.214）
+# 验证：curl https://<LITERATURE_DOMAIN>/health
 # 小程序 / Android：API 根地址为 https://<LITERATURE_DOMAIN>（无尾斜杠、无 /api/v1）
 #
 # 本地 HTTP：根目录 docker-compose.yml 将宿主机 80 映射到 API（http://localhost/health）
@@ -41,10 +44,13 @@ services:
       - "80:80"
       - "443:443"
     env_file:
+      - path: deploy/https.defaults.env
+        required: true
       - path: deploy/https.env
         required: false
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CERT_HOST_DIR:-./deploy/certs}:/etc/caddy/certs:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
