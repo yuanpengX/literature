@@ -16,9 +16,15 @@ Page({
     llmBase: '',
     llmKey: '',
     llmHint: '',
+    apiDomainInput: '',
+    useServerIp: false,
   },
 
   onShow() {
+    this.setData({
+      apiDomainInput: api.getBaseUrlRaw() || '',
+      useServerIp: api.getUseServerIp(),
+    })
     const c = llm.getLlmConfig()
     const idx = Math.max(0, PROVIDERS.findIndex((p) => p.id === c.providerId))
     const pid = PROVIDERS[idx].id
@@ -48,6 +54,54 @@ Page({
   },
   onLlmKey(e) {
     this.setData({ llmKey: e.detail.value })
+  },
+
+  onApiDomainInput(e) {
+    this.setData({ apiDomainInput: e.detail.value })
+  },
+
+  saveApiDomain() {
+    api.setBaseUrl(this.data.apiDomainInput.trim())
+    this.setData({ apiDomainInput: api.getBaseUrlRaw() || '' })
+    wx.showToast({ title: '已保存域名', icon: 'success' })
+  },
+
+  async onServerIpSwitch(e) {
+    const on = e.detail.value
+    if (!on) {
+      api.setUseServerIp(false)
+      this.setData({ useServerIp: false })
+      wx.showToast({ title: '已使用域名', icon: 'success' })
+      return
+    }
+    wx.showLoading({ title: '拉取配置…', mask: true })
+    try {
+      await api.fetchServerHttpIpBase()
+      api.setUseServerIp(true)
+      this.setData({ useServerIp: true })
+      wx.showToast({ title: '已启用 IP', icon: 'success' })
+    } catch (err) {
+      this.setData({ useServerIp: false })
+      wx.showToast({
+        title: (err && err.message) || '失败',
+        icon: 'none',
+        duration: 3000,
+      })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
+  async refreshServerIp() {
+    wx.showLoading({ title: '刷新…', mask: true })
+    try {
+      await api.fetchServerHttpIpBase()
+      wx.showToast({ title: '已更新', icon: 'success' })
+    } catch (e) {
+      wx.showToast({ title: (e && e.message) || '失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
   },
 
   async saveLlmLocal() {

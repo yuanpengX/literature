@@ -58,3 +58,19 @@
   font-size: 24rpx;
   color: #6750A4;
 }
+
+.row-switch {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+  padding: 8rpx 0;
+}
+
+.row-switch-label {
+  flex: 1;
+  font-size: 28rpx;
+  color: #1c1b1f;
+  margin-right: 24rpx;
+}

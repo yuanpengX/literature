@@ -1,5 +1,17 @@
 <scroll-view scroll-y class="page">
   <view class="section">
+    <text class="h">文献 API</text>
+    <text class="p">默认与打包 DEFAULT_BASE_URL 一致；下方可填 HTTPS 根地址覆盖（勿含 /api/v1）。开启「IP」后使用服务端 server/.env 的 LITERATURE_HTTP_IP_BASE，须先能访问域名以拉取配置；真机 HTTP 受合法域名与系统策略限制。</text>
+    <input class="input" placeholder="HTTPS 域名根地址（可选）" value="{{apiDomainInput}}" bindinput="onApiDomainInput" />
+    <button class="btn-light" bindtap="saveApiDomain">保存域名</button>
+    <view class="row-switch">
+      <text class="row-switch-label">使用服务端 IP（HTTP）</text>
+      <switch checked="{{useServerIp}}" bindchange="onServerIpSwitch" />
+    </view>
+    <button wx:if="{{useServerIp}}" class="btn-light" bindtap="refreshServerIp">从服务器刷新 IP</button>
+  </view>
+
+  <view class="section">
     <text class="h">大模型（BYOK）</text>
     <text class="p">端上要点直连模型商。保存本机后若填写了 Key，会尝试同步到文献服务器以启用每日精选与推荐一句话摘要（须可信服务）。</text>
     <picker mode="selector" range="{{providers}}" range-key="label" value="{{providerIndex}}" bindchange="onProvider">

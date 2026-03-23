@@ -6,6 +6,8 @@
 const paths = require('./api-paths.js')
 const DEFAULT_BASE_URL = 'http://47.103.51.214'
 const TOKEN_KEY = 'mp_access_token'
+const STORAGE_USE_SERVER_IP = 'api_use_server_ip'
+const STORAGE_IP_BASE_CACHED = 'api_http_ip_base_cached'
 
 function getToken() {
   return wx.getStorageSync(TOKEN_KEY) || ''
@@ -170,9 +172,82 @@ function normalizeBaseUrl(raw) {
   return canonicalizeLiteratureApiBase(raw)
 }
 
-function getBaseUrl() {
+/** 域名模式下的根地址（用于拉取 /config/client；不受「IP 开关」影响） */
+function getDomainBaseUrl() {
   const raw = getBaseUrlRaw() || DEFAULT_BASE_URL
   return canonicalizeLiteratureApiBase(raw) || canonicalizeLiteratureApiBase(DEFAULT_BASE_URL) || ''
+}
+
+function getUseServerIp() {
+  try {
+    return !!wx.getStorageSync(STORAGE_USE_SERVER_IP)
+  } catch (e) {
+    return false
+  }
+}
+
+function setUseServerIp(on) {
+  wx.setStorageSync(STORAGE_USE_SERVER_IP, !!on)
+}
+
+function getCachedServerIpBase() {
+  try {
+    return wx.getStorageSync(STORAGE_IP_BASE_CACHED) || ''
+  } catch (e) {
+    return ''
+  }
+}
+
+function setCachedServerIpBase(url) {
+  const n = url && String(url).trim() ? canonicalizeLiteratureApiBase(String(url).trim()) : ''
+  wx.setStorageSync(STORAGE_IP_BASE_CACHED, n)
+}
+
+/**
+ * 使用当前域名根请求公开接口，写入缓存并返回规范化根地址。
+ * @param {string} [domainRoot] 省略则用 getDomainBaseUrl()
+ */
+function fetchServerHttpIpBase(domainRoot) {
+  const base = canonicalizeLiteratureApiBase(domainRoot || getDomainBaseUrl())
+  if (!base) {
+    return Promise.reject(new Error('域名根地址无效'))
+  }
+  const url = joinLiteratureApiUrl(base, paths.CONFIG_CLIENT)
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url,
+      method: 'GET',
+      header: { 'Content-Type': 'application/json' },
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          const raw = res.data && res.data.http_ip_base
+          const n = canonicalizeLiteratureApiBase(raw)
+          if (n) {
+            setCachedServerIpBase(n)
+            resolve(n)
+          } else {
+            reject(new Error('服务端未配置 LITERATURE_HTTP_IP_BASE'))
+          }
+        } else {
+          const d = res.data
+          const msg =
+            (d && (d.detail || d.message)) || 'HTTP ' + res.statusCode
+          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+        }
+      },
+      fail(err) {
+        reject(new Error((err && err.errMsg) || '网络错误'))
+      },
+    })
+  })
+}
+
+function getBaseUrl() {
+  if (getUseServerIp()) {
+    const n = canonicalizeLiteratureApiBase(getCachedServerIpBase())
+    if (n) return n
+  }
+  return getDomainBaseUrl()
 }
 
 function setBaseUrl(url) {
@@ -357,6 +432,12 @@ module.exports = {
   setToken,
   clearToken,
   getBaseUrl,
+  getDomainBaseUrl,
+  getUseServerIp,
+  setUseServerIp,
+  getCachedServerIpBase,
+  setCachedServerIpBase,
+  fetchServerHttpIpBase,
   setBaseUrl,
   getBaseUrlRaw,
   normalizeBaseUrl,

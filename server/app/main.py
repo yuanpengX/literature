@@ -17,7 +17,7 @@ from app.database import (
     ensure_user_subscription_columns,
 )
 import app.models  # noqa: F401 — 注册全部 ORM，供 create_all 建 fcm_tokens 等表
-from app.routers import auth_wechat, daily_picks, devices, events, feed, papers, prefs, search, subscriptions
+from app.routers import auth_wechat, client_config, daily_picks, devices, events, feed, papers, prefs, search, subscriptions
 from app.services.daily_picks import run_daily_picks_for_all_users
 from app.services.ingest import run_ingestion_standalone
 from app.services.jobs import purge_old_events, purge_old_papers
@@ -117,6 +117,7 @@ app.add_middleware(
 
 api_prefix = "/api/v1"
 app.include_router(auth_wechat.router, prefix=api_prefix)
+app.include_router(client_config.router, prefix=api_prefix)
 app.include_router(feed.router, prefix=api_prefix)
 app.include_router(papers.router, prefix=api_prefix)
 app.include_router(search.router, prefix=api_prefix)

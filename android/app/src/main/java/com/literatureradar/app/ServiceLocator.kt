@@ -72,10 +72,18 @@ object ServiceLocator {
         val defaultBase = appContext.getString(R.string.api_base_url)
         val fromPrefs = AppPrefs.getApiBaseUrl(appContext).trim()
         val raw = (fromPrefs.ifBlank { defaultBase }).trim()
-        var normalized = AppPrefs.normalizeApiBaseUrl(raw)
-        if (normalized.isEmpty()) {
-            normalized = AppPrefs.normalizeApiBaseUrl(defaultBase)
+        var domainNorm = AppPrefs.normalizeApiBaseUrl(raw)
+        if (domainNorm.isEmpty()) {
+            domainNorm = AppPrefs.normalizeApiBaseUrl(defaultBase)
         }
+        val normalized =
+            if (AppPrefs.isUseServerIpBase(appContext)) {
+                val ipRaw = AppPrefs.getCachedHttpIpBase(appContext).trim()
+                val ipNorm = AppPrefs.normalizeApiBaseUrl(ipRaw)
+                if (ipNorm.isNotEmpty()) ipNorm else domainNorm
+            } else {
+                domainNorm
+            }
         val base = normalized.trimEnd('/') + "/"
         val cur = network
         if (cur != null && cur.baseUrl == base) return

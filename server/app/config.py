@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     wechat_miniprogram_app_secret: str = ""
     jwt_secret: str = ""
     jwt_expires_days: int = 30
+    # 客户端「IP 直连」模式：在 server/.env 填写后，由 GET /api/v1/config/client 返回（勿含 /api/v1）
+    literature_http_ip_base: str = ""  # LITERATURE_HTTP_IP_BASE，例 http://47.103.51.214
 
 
 settings = Settings()

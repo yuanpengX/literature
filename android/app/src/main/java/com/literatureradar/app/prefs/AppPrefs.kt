@@ -8,8 +8,10 @@ object AppPrefs {
     private const val PREFS = "literature_prefs"
     private const val KEY_DIGEST = "local_digest_enabled"
     private const val KEY_LAST_TOP_ID = "last_feed_top_id"
-    /** 为空则使用 strings.xml 的 api_base_url */
+    /** 为空则使用 strings.xml 的 api_base_url（HTTPS 域名根；用于拉取服务端 IP 配置） */
     private const val KEY_API_BASE_URL = "api_base_url"
+    private const val KEY_USE_SERVER_IP = "api_use_server_ip_base"
+    private const val KEY_CACHED_HTTP_IP_BASE = "api_http_ip_base_cached"
 
     /**
      * Retrofit 接口路径已带 `api/v1/...`。
@@ -84,6 +86,25 @@ object AppPrefs {
         val stored = if (url.isBlank()) "" else normalizeApiBaseUrl(url)
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_API_BASE_URL, stored)
+            .apply()
+    }
+
+    fun isUseServerIpBase(ctx: Context): Boolean =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_SERVER_IP, false)
+
+    fun setUseServerIpBase(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_USE_SERVER_IP, on)
+            .apply()
+    }
+
+    fun getCachedHttpIpBase(ctx: Context): String =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CACHED_HTTP_IP_BASE, "") ?: ""
+
+    fun setCachedHttpIpBase(ctx: Context, url: String) {
+        val stored = if (url.isBlank()) "" else normalizeApiBaseUrl(url)
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_CACHED_HTTP_IP_BASE, stored)
             .apply()
     }
 }

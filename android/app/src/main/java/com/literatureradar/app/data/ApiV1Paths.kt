@@ -7,6 +7,9 @@ package com.literatureradar.app.data
  * 修改服务端路由时请同步：本文件、api-paths.js、contracts/openapi-stub.yaml。
  */
 object ApiV1Paths {
+    /** 公开：服务端 LITERATURE_HTTP_IP_BASE */
+    const val CONFIG_CLIENT = "api/v1/config/client"
+
     /** 仅微信小程序；Android 使用 X-User-Id，不在 [LiteratureApi] 中声明 */
     const val AUTH_WECHAT_LOGIN = "api/v1/auth/wechat/login"
 

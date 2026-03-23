@@ -4,6 +4,8 @@
  * 修改服务端路由时请同步：本文件、ApiV1Paths.kt、contracts/openapi-stub.yaml。
  */
 module.exports = {
+  /** 公开：返回服务端 LITERATURE_HTTP_IP_BASE，供「IP 直连」开关拉取 */
+  CONFIG_CLIENT: '/api/v1/config/client',
   /** 仅小程序；Android 使用 X-User-Id */
   AUTH_WECHAT_LOGIN: '/api/v1/auth/wechat/login',
   FEED: '/api/v1/feed',

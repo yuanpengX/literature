@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.util.NetworkErrorHumanizer
 import com.literatureradar.app.ServiceLocator
+import com.literatureradar.app.data.LiteratureClientConfigFetcher
 import com.literatureradar.app.data.UserLlmCredentialsBody
 import com.literatureradar.app.data.llm.LlmPresets
 import com.literatureradar.app.prefs.AppPrefs
@@ -40,6 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.literatureradar.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +73,9 @@ fun SettingsScreen(
 
     var llmHint by remember { mutableStateOf<String?>(null) }
     var dailyLlmHint by remember { mutableStateOf<String?>(null) }
+    var literatureApiDomain by remember { mutableStateOf(AppPrefs.getApiBaseUrl(ctx)) }
+    var useServerIp by remember { mutableStateOf(AppPrefs.isUseServerIpBase(ctx)) }
+    var apiBaseHint by remember { mutableStateOf<String?>(null) }
     val scope = remember { CoroutineScope(Dispatchers.Main) }
 
     val preset = LlmPresets.byId(providerId)
@@ -91,6 +96,111 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text("文献 API 根地址", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "默认走 HTTPS 域名（与 strings.xml 一致，可下方覆盖）。开启「IP」后使用服务端 server/.env 的 LITERATURE_HTTP_IP_BASE，需先能访问域名以拉取配置。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = literatureApiDomain,
+                onValueChange = { literatureApiDomain = it },
+                label = { Text("自定义域名根地址（可选）") },
+                placeholder = { Text(ctx.getString(R.string.api_base_url)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                singleLine = false,
+            )
+            Button(
+                onClick = {
+                    AppPrefs.setApiBaseUrl(ctx, literatureApiDomain.trim())
+                    literatureApiDomain = AppPrefs.getApiBaseUrl(ctx)
+                    ServiceLocator.rebuildNetworkIfNeeded()
+                    apiBaseHint = "已保存域名根地址"
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("保存文献 API 域名")
+            }
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("使用服务端 IP（HTTP）", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "从 /api/v1/config/client 读取；真机 HTTP 可能受系统限制。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = useServerIp,
+                    onCheckedChange = { on ->
+                        if (!on) {
+                            AppPrefs.setUseServerIpBase(ctx, false)
+                            useServerIp = false
+                            ServiceLocator.rebuildNetworkIfNeeded()
+                            apiBaseHint = "已切回域名模式"
+                            return@Switch
+                        }
+                        scope.launch {
+                            apiBaseHint = "正在拉取 IP 配置…"
+                            val domainRoot =
+                                AppPrefs.normalizeApiBaseUrl(
+                                    AppPrefs.getApiBaseUrl(ctx).ifBlank { ctx.getString(R.string.api_base_url) },
+                                ).ifEmpty {
+                                    AppPrefs.normalizeApiBaseUrl(ctx.getString(R.string.api_base_url))
+                                }
+                            val ip =
+                                withContext(Dispatchers.IO) {
+                                    LiteratureClientConfigFetcher.fetchHttpIpBase(domainRoot)
+                                }
+                            if (ip == null) {
+                                apiBaseHint =
+                                    "拉取失败：请确认网络与 HTTPS 域名，且服务端已配置 LITERATURE_HTTP_IP_BASE"
+                                return@launch
+                            }
+                            AppPrefs.setCachedHttpIpBase(ctx, ip)
+                            AppPrefs.setUseServerIpBase(ctx, true)
+                            useServerIp = true
+                            ServiceLocator.rebuildNetworkIfNeeded()
+                            apiBaseHint = "已启用 IP：$ip"
+                        }
+                    },
+                )
+            }
+            if (useServerIp) {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            apiBaseHint = "正在刷新…"
+                            val domainRoot =
+                                AppPrefs.normalizeApiBaseUrl(
+                                    AppPrefs.getApiBaseUrl(ctx).ifBlank { ctx.getString(R.string.api_base_url) },
+                                ).ifEmpty {
+                                    AppPrefs.normalizeApiBaseUrl(ctx.getString(R.string.api_base_url))
+                                }
+                            val ip =
+                                withContext(Dispatchers.IO) {
+                                    LiteratureClientConfigFetcher.fetchHttpIpBase(domainRoot)
+                                }
+                            if (ip == null) {
+                                apiBaseHint = "刷新失败"
+                                return@launch
+                            }
+                            AppPrefs.setCachedHttpIpBase(ctx, ip)
+                            ServiceLocator.rebuildNetworkIfNeeded()
+                            apiBaseHint = "已更新：$ip"
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("从服务器刷新 IP 根地址")
+                }
+            }
+            apiBaseHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+
             Text("大模型（BYOK）", style = MaterialTheme.typography.titleMedium)
             Text(
                 "端上「生成中文要点」直连模型商。若使用服务端「每日精选」与「推荐列表中文摘要（2～3 句）」，保存时需把 Key 同步到你信任的文献服务器（见下方说明）。",

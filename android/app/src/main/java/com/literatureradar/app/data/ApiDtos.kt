@@ -140,3 +140,8 @@ data class UserSubscriptionsJson(
     val journals: List<SubscriptionJournalItemJson> = emptyList(),
     val conferences: List<SubscriptionConferenceItemJson> = emptyList(),
 )
+
+@Serializable
+data class ClientConfigJson(
+    @SerialName("http_ip_base") val httpIpBase: String = "",
+)
