@@ -262,6 +262,7 @@ function postEvents(events) {
 
 module.exports = {
   bootstrapWechatLogin,
+  ensureLoginAttempted,
   getToken,
   setToken,
   clearToken,
