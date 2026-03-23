@@ -25,6 +25,7 @@ build/
 !**/.env.example
 !**/docker-compose.example.env
 server/.env
+deploy/https.env
 
 # --- 本地数据库 / 数据文件 ---
 *.db

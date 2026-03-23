@@ -32,7 +32,33 @@ docker compose up -d --build
 - 接口地址：`http://<主机IP>:8000`
 - 健康检查：`GET /health`
 - 数据：`SQLite` 文件在卷 **`literature_data`** 内路径 `/data/literature.db`（勿删卷以免丢库）
-- 可选环境变量：复制 [`server/docker-compose.example.env`](server/docker-compose.example.env) 为 `server/.env`，按需修改后把内容**合并进**根目录 `docker-compose.yml` 的 `environment`（或自建 `docker-compose.override.yml`，勿将含密钥的 override 提交仓库）
+- 可选环境变量：复制 [`server/.env.example`](server/.env.example) 为 `server/.env`（密钥勿提交）；Compose 已通过 `env_file` 加载该文件
+
+### HTTPS（小程序真机 / 合法域名）
+
+真机与正式版要求 **HTTPS** 且域名在公众平台配置为 **request 合法域名**。推荐用 **Caddy** 自动申请并续期 **Let’s Encrypt** 证书（`--profile https`）。
+
+**前置条件**
+
+1. 已有一个**解析到服务器公网 IP** 的域名（仅子域即可，如 `api.example.com`）。
+2. 云安全组 / 防火墙放行 **TCP 80、443**（证书校验需访问 80；业务走 443）。
+3. 服务器能访问 Let’s Encrypt（部分网络环境若失败，需换用其它证书源或境外线路，见文末说明）。
+
+**步骤**
+
+```bash
+cp deploy/https.env.example deploy/https.env
+# 编辑 deploy/https.env：填写 LITERATURE_DOMAIN=api.你的域名.com（无 https://、无端口）
+docker compose --profile https up -d --build
+```
+
+- 对外地址：`https://<LITERATURE_DOMAIN>`（路径仍为 `/api/v1/...`，如 `https://api.example.com/health`）
+- 小程序：把 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 中 `DEFAULT_BASE_URL` 改为上述 **https 根地址**，或在设置里写入 `api_base_url`
+- 微信公众平台 → 开发设置 → **服务器域名** → request 合法域名填：`https://api.你的域名.com`（与微信后台要求一致，**不要**带尾路径）
+- 内地小程序域名通常需**备案**；请按微信与管局要求自行完成
+- 生产环境可在安全组**关闭 8000 对外**，仅保留 80/443，由 Caddy 反代到容器内 `literature-api:8000`
+
+**说明**：若 Let’s Encrypt 在你所在网络不可用，可改用云厂商免费证书（如腾讯云 SSL）手动得到 `fullchain.pem` / `privkey.pem` 后，自行改写 `deploy/Caddyfile` 使用 `tls /path/to/cert.pem /path/to/key.pem` 并挂载证书目录（需自行查阅 Caddy 文档）。
 
 停止并删除容器（保留数据卷）：
 

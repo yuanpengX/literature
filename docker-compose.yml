@@ -13,6 +13,8 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+    env_file:
+      - server/.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -33,5 +35,27 @@ services:
       - literature_data:/data
     restart: unless-stopped
 
+  # HTTPS：自动 Let’s Encrypt，供小程序真机 request 合法域名
+  # 用法：cp deploy/https.env.example deploy/https.env 并填写域名与邮箱 →
+  #       docker compose --profile https up -d --build
+  caddy:
+    image: caddy:2-alpine
+    profiles:
+      - https
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - deploy/https.env
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - literature-api
+    restart: unless-stopped
+
 volumes:
   literature_data:
+  caddy_data:
+  caddy_config:
