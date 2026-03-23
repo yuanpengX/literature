@@ -76,7 +76,8 @@ function summarizePaperChinese(title, abstract, cb) {
     return
   }
   const mid = (model || '').trim() || defaultModel(providerId)
-  const url = root + '/chat/completions'
+  const r = root.replace(/\/+$/, '')
+  const url = r + '/chat/completions'
   const body = {
     model: mid,
     messages: [

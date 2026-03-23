@@ -40,7 +40,7 @@ function postWechatLogin(code) {
   if (!base) {
     return Promise.reject(new Error('文献 API 根地址无效'))
   }
-  const url = base + '/api/v1/auth/wechat/login'
+  const url = joinLiteratureApiUrl(base, '/api/v1/auth/wechat/login')
   return new Promise((resolve, reject) => {
     wx.request({
       url,
@@ -120,31 +120,71 @@ function getBaseUrlRaw() {
   return u && String(u).trim() ? String(u).trim() : ''
 }
 
-function normalizeBaseUrl(raw) {
-  let s = String(raw || '').trim().replace(/\/+$/, '')
-  while (s.length) {
-    const l = s.toLowerCase()
+function stripApiVersionSuffix(s) {
+  let x = String(s || '').trim().replace(/\/+$/, '')
+  while (x.length) {
+    const l = x.toLowerCase()
     if (l.endsWith('/api/v1')) {
-      s = s.slice(0, -7).replace(/\/+$/, '')
+      x = x.slice(0, -7).replace(/\/+$/, '')
       continue
     }
     if (l.endsWith('/api/v2')) {
-      s = s.slice(0, -7).replace(/\/+$/, '')
+      x = x.slice(0, -7).replace(/\/+$/, '')
       continue
     }
     break
   }
-  return s.replace(/\/+$/, '')
+  return x.replace(/\/+$/, '')
+}
+
+/**
+ * 文献 API 根地址：仅保留 origin（协议+主机+端口），去掉误粘贴路径、重复 scheme、默认端口表现一。
+ * 与 Android AppPrefs.normalizeApiBaseUrl 行为对齐。
+ */
+function canonicalizeLiteratureApiBase(raw) {
+  let s = String(raw || '')
+    .trim()
+    .replace(/\s+/g, '')
+  if (!s) return ''
+  while (/^https:\/\/https:\/\//i.test(s)) s = s.slice(8)
+  while (/^http:\/\/https:\/\//i.test(s)) s = s.slice(7)
+  while (/^https:\/\/http:\/\//i.test(s)) s = s.slice(8)
+  while (/^http:\/\/http:\/\//i.test(s)) s = s.slice(7)
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s
+  try {
+    if (typeof URL !== 'undefined') {
+      const u = new URL(s)
+      if (!u.hostname) return ''
+      return stripApiVersionSuffix(u.origin)
+    }
+  } catch (e) {
+    /* fall through */
+  }
+  const m = s.match(/^(https?:\/\/)([^/?#\s]+)/i)
+  if (!m) return ''
+  return stripApiVersionSuffix(m[1] + m[2])
+}
+
+function normalizeBaseUrl(raw) {
+  return canonicalizeLiteratureApiBase(raw)
 }
 
 function getBaseUrl() {
   const raw = getBaseUrlRaw() || DEFAULT_BASE_URL
-  return normalizeBaseUrl(raw)
+  return canonicalizeLiteratureApiBase(raw) || canonicalizeLiteratureApiBase(DEFAULT_BASE_URL) || ''
 }
 
 function setBaseUrl(url) {
-  const n = url && String(url).trim() ? normalizeBaseUrl(url) : ''
+  const t = url && String(url).trim() ? String(url).trim() : ''
+  const n = t ? canonicalizeLiteratureApiBase(t) : ''
   wx.setStorageSync('api_base_url', n)
+}
+
+/** 拼接文献 API 完整 URL，避免双斜杠或漏斜杠 */
+function joinLiteratureApiUrl(base, path) {
+  const b = String(base || '').replace(/\/+$/, '')
+  const p = path && String(path).startsWith('/') ? path : '/' + (path || '')
+  return b + p
 }
 
 function request(path, method, data, retry401) {
@@ -152,7 +192,7 @@ function request(path, method, data, retry401) {
   if (!base) {
     return Promise.reject(new Error('文献 API 根地址无效'))
   }
-  const url = base + path
+  const url = joinLiteratureApiUrl(base, path)
   const exec = () =>
     new Promise((resolve, reject) => {
     wx.request({
@@ -189,10 +229,9 @@ function request(path, method, data, retry401) {
         }
         if (raw.indexOf('fail') !== -1 || raw === 'request:fail') {
           const parts = []
-          if (/^http:\/\//i.test(url)) parts.push('当前为 HTTP，真机一般需 HTTPS')
-          if (/\/\/(?:\d{1,3}\.){3}\d{1,3}/.test(url)) parts.push('使用 IP 须在公众平台配置该域名为 request 合法域名')
+          if (/^http:\/\//i.test(url)) parts.push('真机请使用 HTTPS 域名并在公众平台配置 request 合法域名')
           parts.push('开发工具可开「不校验合法域名」')
-          parts.push('确认服务已启动且安全组/防火墙放行端口')
+          parts.push('确认服务已启动且域名解析、防火墙正确')
           msg += ' — ' + parts.join('；')
         }
         reject(new Error(msg))
@@ -270,6 +309,8 @@ module.exports = {
   setBaseUrl,
   getBaseUrlRaw,
   normalizeBaseUrl,
+  canonicalizeLiteratureApiBase,
+  joinLiteratureApiUrl,
   DEFAULT_BASE_URL,
   getFeed,
   search,

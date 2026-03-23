@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="page">
   <view class="section">
     <text class="h">文献服务器</text>
-    <text class="p">填写 API 根地址，勿带 /api/v1。留空则与 Android 相同，使用内置默认（与 strings.xml 同步）。</text>
+    <text class="p">填写文献服务根地址（https 域名，如 https://cppteam.cn），勿带 /api/v1。留空则用内置默认，与 Android 一致。</text>
     <input class="input" placeholder="{{apiDefaultPlaceholder}}" value="{{apiBase}}" bindinput="onApiBase" />
     <button class="btn" bindtap="applyApi">应用后端地址</button>
     <text wx:if="{{apiHint}}" class="hint">{{apiHint}}</text>

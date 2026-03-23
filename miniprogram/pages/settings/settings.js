@@ -22,12 +22,19 @@ Page({
   },
 
   onShow() {
-    const raw = api.getBaseUrlRaw()
+    let raw = api.getBaseUrlRaw()
+    if (raw) {
+      const fixed = api.canonicalizeLiteratureApiBase(raw)
+      if (fixed && fixed !== raw) {
+        api.setBaseUrl(fixed)
+        raw = fixed
+      }
+    }
     const c = llm.getLlmConfig()
     const idx = Math.max(0, PROVIDERS.findIndex((p) => p.id === c.providerId))
     const pid = PROVIDERS[idx].id
     this.setData({
-      apiBase: raw,
+      apiBase: raw ? api.canonicalizeLiteratureApiBase(raw) || raw : '',
       apiDefaultPlaceholder: api.DEFAULT_BASE_URL,
       providerIndex: idx,
       llmModel: c.model || llm.defaultModel(pid),
@@ -44,11 +51,26 @@ Page({
 
   applyApi() {
     const u = (this.data.apiBase || '').trim()
-    api.setBaseUrl(u)
+    if (!u) {
+      api.setBaseUrl('')
+      this.setData({
+        apiBase: '',
+        apiHint: '已清空；将使用内置默认 ' + api.DEFAULT_BASE_URL,
+      })
+      return
+    }
+    const norm = api.canonicalizeLiteratureApiBase(u)
+    if (!norm) {
+      this.setData({
+        apiHint:
+          '地址无效。请填写文献服务根地址，例如 https://cppteam.cn（勿手写 IP 拼接、勿带 /api/v1）',
+      })
+      return
+    }
+    api.setBaseUrl(norm)
     this.setData({
-      apiHint: u
-        ? '已保存；请重新进入各页加载数据'
-        : '已清空；将使用与 Android strings.xml 相同的内置默认（见 utils/api.js）',
+      apiBase: norm,
+      apiHint: '已保存：' + norm + '；请重新进入各页加载数据',
     })
   },
 

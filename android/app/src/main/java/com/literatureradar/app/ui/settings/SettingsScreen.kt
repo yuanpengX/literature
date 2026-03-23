@@ -95,7 +95,7 @@ fun SettingsScreen(
         ) {
             Text("文献服务器", style = MaterialTheme.typography.titleMedium)
             Text(
-                "填写服务根地址，例如 https://你的域名 或 http://10.0.2.2（默认端口勿写 :443/:80）；勿以 / 结尾，也不要带 /api/v1。修改后点「应用」。",
+                "填写文献服务根地址：使用 https 域名（如 https://cppteam.cn），可省略协议则默认补 https；勿带 /api/v1。Debug 构建若未填写则使用工程内默认。修改后点「应用」。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -111,21 +111,22 @@ fun SettingsScreen(
             Button(
                 onClick = {
                     val u = serverUrl.trim()
-                    if (u.isNotEmpty() && !u.startsWith("http://") && !u.startsWith("https://")) {
-                        backendHint = "地址需以 http:// 或 https:// 开头"
+                    val norm = AppPrefs.normalizeApiBaseUrl(u)
+                    if (u.isNotBlank() && norm.isEmpty()) {
+                        backendHint = "地址无效。请填写域名根地址，例如 https://cppteam.cn（勿带 /api/v1）"
                         return@Button
                     }
                     val beforeNorm = u
                     AppPrefs.setApiBaseUrl(ctx, u)
-                    val norm = if (u.isBlank()) "" else AppPrefs.normalizeApiBaseUrl(u)
-                    serverUrl = norm
+                    serverUrl = AppPrefs.getApiBaseUrl(ctx)
                     ServiceLocator.rebuildNetworkIfNeeded()
                     DigestScheduler.schedule(ctx)
                     backendHint = when {
                         beforeNorm.isNotBlank() &&
-                            beforeNorm.trimEnd('/').lowercase() != norm.lowercase() ->
-                            "已应用；已自动去掉末尾的 /api/v1 等重复路径"
-                        else -> "已应用后端地址"
+                            beforeNorm.replace(Regex("\\s+"), "").trimEnd('/').lowercase() != norm.lowercase() ->
+                            "已应用；已规范为 $norm"
+                        norm.isNotBlank() -> "已应用后端地址"
+                        else -> "已清空；将使用默认地址"
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
