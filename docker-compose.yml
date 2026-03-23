@@ -1,6 +1,9 @@
 # 文献雷达 API — Docker 部署（默认 SQLite 持久化到卷）
 # 使用：在项目根目录执行  docker compose up -d --build
 #
+# 腾讯云 CVM：宿主机建议配置 Docker 镜像加速（拉 python 等基础镜像更快）
+#   /etc/docker/daemon.json → "registry-mirrors": ["https://mirror.ccs.tencentyun.com"]
+#
 # 中国大陆：
 # - 拉取 python 镜像若慢，可配置 Docker 镜像加速（阿里云/ DaoCloud 等）后再 build
 # - 若容器内访问 arXiv 不稳定，可取消注释 HTTP(S)_PROXY 指向本机合法代理

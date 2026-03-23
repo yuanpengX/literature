@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">文献雷达</string>
-    <!-- 模拟器访问本机后端：10.0.2.2；真机改为电脑局域网 IP -->
-    <string name="api_base_url">http://10.0.2.2:8000</string>
+    <!-- 模拟器：http://10.0.2.2:8000；本机 CVM 公网访问 API（需在安全组放行 TCP 8000，EIP 变更时请改此处） -->
+    <string name="api_base_url">http://150.158.141.175:8000</string>
     <!-- 关于页外链：请替换为你的正式合规页面 -->
     <string name="url_privacy_policy">https://example.com/privacy</string>
     <string name="url_terms">https://example.com/terms</string>

@@ -3,23 +3,22 @@ package com.literatureradar.app.data.llm
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import androidx.security.crypto.MasterKeys
 
 /**
  * 使用 EncryptedSharedPreferences 保存用户自备 API Key 与模型配置（仅存本机）。
+ * （security-crypto 1.0.x：MasterKeys + create 文件名/别名/context）
  */
 class LlmSecureStore(context: Context) {
 
     private val prefs: SharedPreferences
 
     init {
-        val masterKey = MasterKey.Builder(context.applicationContext)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         prefs = EncryptedSharedPreferences.create(
-            context.applicationContext,
             "llm_secure_prefs",
-            masterKey,
+            masterKeyAlias,
+            context.applicationContext,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )

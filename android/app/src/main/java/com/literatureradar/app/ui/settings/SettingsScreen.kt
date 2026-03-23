@@ -147,7 +147,7 @@ fun SettingsScreen(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerMenu) },
                     colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                 )
-                androidx.compose.material3.ExposedDropdownMenu(
+                ExposedDropdownMenu(
                     expanded = providerMenu,
                     onDismissRequest = { providerMenu = false },
                 ) {

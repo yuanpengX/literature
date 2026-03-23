@@ -43,6 +43,21 @@ android/*.aab
 android/*.ap_
 android/.cxx/
 android/.kotlin/
+# 签名与密钥（勿提交）
+**/*.jks
+**/*.keystore
+**/keystore.properties
+**/key.properties
+**/signing.properties
+**/upload_certificate.pem
+# Firebase / Google 服务（仅本机配置时不入库）
+android/app/google-services.json
+
+# 任意位置的打包产物 / 分析临时文件
+*.apk
+*.aab
+*.ap_
+*.hprof
 
 # --- IDE / 编辑器 ---
 .idea/
