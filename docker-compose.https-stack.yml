@@ -6,8 +6,8 @@
 # 3. 复制 server/.env.example → server/.env 并配置密钥等
 # 4. 在项目根目录：docker compose -f docker-compose.https-stack.yml up -d --build
 #
-# 验证：curl https://你的域名/health
-# 小程序 / Android：API 根地址为 https://你的域名（无尾斜杠、无 /api/v1）
+# 验证：curl https://cppteam.cn/health（域名以 deploy/https.env 为准）
+# 小程序 / Android：API 根地址为 https://<LITERATURE_DOMAIN>（无尾斜杠、无 /api/v1）
 #
 # 本地开发仍可用根目录 docker-compose.yml（直连 :8000）
 

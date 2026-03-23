@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     openalex_enabled: bool = False
     # 官方免费 key：https://openalex.org/settings/api — 建议填写以获得每日免费额度与稳定限流
     openalex_api_key: str = ""
-    openalex_mailto: str = "mailto:dev@example.com"  # 礼貌池，请改为真实联系邮箱
+    openalex_mailto: str = "mailto:admin@cppteam.cn"  # OpenAlex 礼貌池；请改为可收信邮箱
     openalex_per_page: int = 25
     openalex_lookback_days: int = 120
     openalex_venue_source_id: str = ""  # 可选，如某会议/期刊的 OpenAlex Source ID（S…）

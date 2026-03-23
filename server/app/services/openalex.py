@@ -22,7 +22,7 @@ OPENALEX_WORKS = "https://api.openalex.org/works"
 
 def _openalex_base_params() -> dict[str, str]:
     """mailto 必填礼貌参数；api_key 可选，官方建议规模化使用时携带。"""
-    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "admin@cppteam.cn"
     out: dict[str, str] = {"mailto": mailto}
     key = (settings.openalex_api_key or "").strip()
     if key:
@@ -177,7 +177,7 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
 def _openalex_fetch_results(filter_str: str) -> list:
     if not settings.openalex_enabled:
         return []
-    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "admin@cppteam.cn"
     params = {
         "filter": filter_str,
         "per_page": min(max(settings.openalex_per_page, 1), 200),
@@ -248,7 +248,7 @@ def fetch_and_upsert_openalex_for_source_ids(db: Session, source_ids: list[str])
     total = 0
     d = date.today() - timedelta(days=settings.openalex_lookback_days)
     per = min(max(settings.openalex_subscription_per_source, 1), 200)
-    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "admin@cppteam.cn"
     base_q = _openalex_base_params()
     headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
     for raw in source_ids:
@@ -295,7 +295,7 @@ def _arxiv_abs_url(external_id: str) -> str | None:
 def enrich_arxiv_citations(db: Session) -> int:
     if not settings.openalex_enabled or not settings.openalex_enrich_arxiv_citations:
         return 0
-    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "admin@cppteam.cn"
     base_q = _openalex_base_params()
     headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
     limit = min(max(settings.openalex_enrich_per_run, 1), 100)
