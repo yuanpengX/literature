@@ -19,6 +19,11 @@
 
   <view class="tabs tabs-sort">
     <view
+      class="tab {{sort === 'recommended' ? 'tab-on' : ''}}"
+      data-sort="recommended"
+      bindtap="onSort"
+    >综合</view>
+    <view
       class="tab {{sort === 'hot' ? 'tab-on' : ''}}"
       data-sort="hot"
       bindtap="onSort"

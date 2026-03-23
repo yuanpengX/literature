@@ -13,7 +13,8 @@ function matchesChannel(paper, ch) {
 Page({
   data: {
     channel: 'arxiv',
-    sort: 'for_you',
+    // 默认与旧版后端一致；线上已支持 hot/for_you 时可改为 for_you
+    sort: 'recommended',
     items: [],
     nextCursor: null,
     loading: true,
