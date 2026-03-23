@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     daily_picks_timezone: str = "Asia/Shanghai"
     daily_picks_max_candidates: int = 48
     daily_picks_abstract_chars: int = 600
+    # 微信小程序登录（jscode2session）与 JWT；仅服务端持有 app secret
+    wechat_miniprogram_app_id: str = ""
+    wechat_miniprogram_app_secret: str = ""
+    jwt_secret: str = ""
+    jwt_expires_days: int = 30
 
 
 settings = Settings()

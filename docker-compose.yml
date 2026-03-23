@@ -20,6 +20,11 @@ services:
     environment:
       DATABASE_URL: "sqlite:////data/literature.db"
       TZ: Asia/Shanghai
+      # 小程序微信登录（可选，不配则仅支持 X-User-Id / Android）
+      # WECHAT_MINIPROGRAM_APP_ID: ""
+      # WECHAT_MINIPROGRAM_APP_SECRET: ""
+      # JWT_SECRET: "change-me-long-random"
+      # JWT_EXPIRES_DAYS: "30"
       # httpx 默认会读取环境变量中的代理（trust_env）
       # HTTP_PROXY: http://host.docker.internal:7890
       # HTTPS_PROXY: http://host.docker.internal:7890

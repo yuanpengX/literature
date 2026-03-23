@@ -9,11 +9,32 @@
 3. `project.config.json` 中 `appid` 可暂用测试号；正式发布需替换为你的小程序 AppID。
 4. **文献 API 默认地址**：与 Android `res/values/strings.xml` 中 `api_base_url` 一致，内置在 `utils/api.js` 的 `DEFAULT_BASE_URL`；设置里留空即使用该默认（与 APK 未改「应用后端地址」时行为一致）。填写时**不要**带 `/api/v1`。
 5. **request 合法域名**：在微信公众平台为小程序配置你的 **文献 API 域名**（HTTPS）。开发阶段可在开发者工具勾选「不校验合法域名」。
+6. **若订阅页等出现 `request:fail`**：多为真机/预览校验域名或禁止使用纯 HTTP。请为 API 配置 **HTTPS + 备案域名**，在公众平台「开发 → 开发管理 → 服务器域名」添加 request 域名；或仅在开发者工具里打开「不校验合法域名、web-view 域名…」做本地调试。默认的 `http://IP:8000` 与 Android 一致，但小程序线上环境通常不能直接访问。
+
+## 微信登录与用户隔离
+
+小程序使用[官方登录能力](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/login)：`app.js` 启动时调用 `wx.login` 获取 `code`，请求服务端 `POST /api/v1/auth/wechat/login`，换取 **JWT**（`access_token`），后续所有 API 使用请求头 `Authorization: Bearer <token>`。服务端用 `openid` 生成用户主键 `wx:{openid}`，写入 `user_profiles`，订阅 / LLM / 每日精选等均按该用户隔离。
+
+**服务端环境变量**（见 [server/.env.example](../server/.env.example) 与 `docker-compose.yml` 注释）：
+
+| 变量 | 说明 |
+|------|------|
+| `WECHAT_MINIPROGRAM_APP_ID` | 与小程序 `project.config.json` / 公众平台 **AppID** 一致 |
+| `WECHAT_MINIPROGRAM_APP_SECRET` | 仅服务端保存，勿写入小程序代码 |
+| `JWT_SECRET` | 签发 access_token 的 HMAC 密钥（长随机串） |
+| `JWT_EXPIRES_DAYS` | 可选，默认 30 |
+
+未配置微信或 JWT 时，`/auth/wechat/login` 返回 503，小程序会静默失败；此时请求不带 token，后端将用户视为 `anonymous`（与旧行为类似）。**正式环境务必配齐**，否则无法分用户。
+
+**与 Android**：APK 仍通过 `X-User-Id` 识别用户，**不**使用本登录接口；两者用户体系独立。
+
+**升级说明**：曾使用本地随机 `user_id` 的存储已废弃；登录成功后会清除。同一微信账号会得到稳定的 `wx:…` 画像；与旧随机 ID 下的订阅数据**不会自动合并**。
 
 ## 与 Android 的差异说明
 
 | 能力 | 说明 |
 |------|------|
+| 用户身份 | 小程序：`wx.login` + JWT；Android：`X-User-Id`。 |
 | 收藏 | 使用 `wx.setStorageSync`，不共用 Android 的 Room 数据库。 |
 | PDF/原文 | 小程序内不直接打开外链，使用「复制链接」到浏览器查看。 |
 | AI 摘要 | 直连模型商域名，需在小程序后台将该域名加入 **request 合法域名**。 |

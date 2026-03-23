@@ -2,7 +2,9 @@ const api = require('./utils/api.js')
 
 App({
   onLaunch() {
-    api.ensureUserId()
+    api.bootstrapWechatLogin().catch((e) => {
+      console.warn('[literature] wechat login skipped:', (e && e.message) || e)
+    })
   },
   globalData: {
     feedReselectCount: 0,

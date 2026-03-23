@@ -1,16 +1,117 @@
 /**
  * 与 Android LiteratureApi 对齐；Base URL 勿含 /api/v1
- * 内置默认与 android/app/src/main/res/values/strings.xml 中 api_base_url 保持一致（修改时请两处同步）
+ * 小程序：微信登录后使用 Authorization Bearer；不再发送本地随机 X-User-Id
+ * 内置默认与 android/.../strings.xml 中 api_base_url 保持一致（修改时请两处同步）
  */
 const DEFAULT_BASE_URL = 'http://150.158.141.175:8000'
+const TOKEN_KEY = 'mp_access_token'
 
-function ensureUserId() {
-  let id = wx.getStorageSync('user_id')
-  if (!id) {
-    id = 'u-' + Math.random().toString(36).slice(2, 14)
-    wx.setStorageSync('user_id', id)
+function getToken() {
+  return wx.getStorageSync(TOKEN_KEY) || ''
+}
+
+function setToken(t) {
+  wx.setStorageSync(TOKEN_KEY, t || '')
+}
+
+function clearToken() {
+  try {
+    wx.removeStorageSync(TOKEN_KEY)
+  } catch (e) {
+    /* ignore */
   }
-  return id
+}
+
+function wxLoginCode() {
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success(res) {
+        if (res.code) resolve(res.code)
+        else reject(new Error('wx.login 未返回 code'))
+      },
+      fail: reject,
+    })
+  })
+}
+
+/** 不带鉴权头，仅用于登录 */
+function postWechatLogin(code) {
+  const base = getBaseUrl()
+  if (!base) {
+    return Promise.reject(new Error('文献 API 根地址无效'))
+  }
+  const url = base + '/api/v1/auth/wechat/login'
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url,
+      method: 'POST',
+      header: { 'Content-Type': 'application/json' },
+      data: { code },
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(res.data)
+        } else {
+          const d = res.data
+          const msg =
+            (d && (d.detail || d.message)) ||
+            res.errMsg ||
+            'HTTP ' + res.statusCode
+          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+        }
+      },
+      fail(err) {
+        reject(new Error((err && err.errMsg) || '网络错误'))
+      },
+    })
+  })
+}
+
+let _bootstrapPromise = null
+
+/**
+ * 启动时调用：wx.login → 服务端换 JWT。失败时不弹窗（便于未配微信密钥的开发环境）。
+ * 已有 token 时立即 resolve。并发只发起一次登录请求。
+ */
+function bootstrapWechatLogin() {
+  if (getToken()) {
+    return Promise.resolve({ cached: true })
+  }
+  if (_bootstrapPromise) {
+    return _bootstrapPromise
+  }
+  _bootstrapPromise = wxLoginCode()
+    .then((code) => postWechatLogin(code))
+    .then((data) => {
+      const tok = data && data.access_token
+      if (tok) {
+        setToken(tok)
+        try {
+          wx.removeStorageSync('user_id')
+        } catch (e) {
+          /* ignore */
+        }
+      }
+      return data
+    })
+    .finally(() => {
+      _bootstrapPromise = null
+    })
+  return _bootstrapPromise
+}
+
+/** 无 token 时先尝试登录，避免首屏请求落到 anonymous */
+function ensureLoginAttempted() {
+  if (getToken()) return Promise.resolve()
+  return bootstrapWechatLogin().catch(() => {})
+}
+
+function buildAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' }
+  const tok = getToken()
+  if (tok) {
+    headers.Authorization = 'Bearer ' + tok
+  }
+  return headers
 }
 
 /** 用户覆盖项（同 Android AppPrefs.getApiBaseUrl）；为空表示使用 DEFAULT_BASE_URL */
@@ -46,22 +147,28 @@ function setBaseUrl(url) {
   wx.setStorageSync('api_base_url', n)
 }
 
-function request(path, method, data) {
+function request(path, method, data, retry401) {
   const base = getBaseUrl()
   if (!base) {
     return Promise.reject(new Error('文献 API 根地址无效'))
   }
   const url = base + path
-  return new Promise((resolve, reject) => {
+  const exec = () =>
+    new Promise((resolve, reject) => {
     wx.request({
       url,
       method: method || 'GET',
       data: method === 'GET' ? data : data,
-      header: {
-        'Content-Type': 'application/json',
-        'X-User-Id': ensureUserId(),
-      },
+      header: buildAuthHeaders(),
       success(res) {
+        if (res.statusCode === 401 && getToken() && !retry401) {
+          clearToken()
+          bootstrapWechatLogin()
+            .then(() => request(path, method, data, true))
+            .then(resolve)
+            .catch(reject)
+          return
+        }
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
         } else {
@@ -74,10 +181,28 @@ function request(path, method, data) {
         }
       },
       fail(err) {
-        reject(new Error(err.errMsg || '网络错误'))
+        const raw = (err && err.errMsg) || '网络错误'
+        const errno = err && err.errno
+        let msg = raw
+        if (errno != null && String(errno) !== '') {
+          msg += ' (errno:' + errno + ')'
+        }
+        if (raw.indexOf('fail') !== -1 || raw === 'request:fail') {
+          const parts = []
+          if (/^http:\/\//i.test(url)) parts.push('当前为 HTTP，真机一般需 HTTPS')
+          if (/\/\/(?:\d{1,3}\.){3}\d{1,3}/.test(url)) parts.push('使用 IP 须在公众平台配置该域名为 request 合法域名')
+          parts.push('开发工具可开「不校验合法域名」')
+          parts.push('确认服务已启动且安全组/防火墙放行端口')
+          msg += ' — ' + parts.join('；')
+        }
+        reject(new Error(msg))
       },
     })
   })
+  if (retry401) {
+    return exec()
+  }
+  return ensureLoginAttempted().then(exec)
 }
 
 function getFeed(cursor, limit, sort, channel) {
@@ -136,7 +261,10 @@ function postEvents(events) {
 }
 
 module.exports = {
-  ensureUserId,
+  bootstrapWechatLogin,
+  getToken,
+  setToken,
+  clearToken,
   getBaseUrl,
   setBaseUrl,
   getBaseUrlRaw,

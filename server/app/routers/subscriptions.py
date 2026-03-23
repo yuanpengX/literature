@@ -14,11 +14,11 @@ from app.catalog.presets import (
     default_subscription_conferences,
     default_subscription_journals,
     default_subscription_keywords,
-    keywords_csv_from_subscription_json,
 )
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
 from app.services.ingest import run_ingestion_standalone
+from app.services.user_defaults import default_subscription_tuple
 from app.schemas import (
     ConferencePresetOut,
     JournalPresetOut,
@@ -122,11 +122,7 @@ def _migrate_keywords_csv_to_json(u: UserProfile) -> bool:
 
 
 def _default_profile_payload() -> tuple[str, str, str, str]:
-    kw_j = json.dumps(default_subscription_keywords(), ensure_ascii=False)
-    j_j = json.dumps(default_subscription_journals(), ensure_ascii=False)
-    c_j = json.dumps(default_subscription_conferences(), ensure_ascii=False)
-    csv = keywords_csv_from_subscription_json(kw_j)
-    return kw_j, j_j, c_j, csv
+    return default_subscription_tuple()
 
 
 @router.get("/subscriptions/catalog", response_model=SubscriptionCatalogResponse)

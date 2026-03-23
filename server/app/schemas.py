@@ -59,6 +59,18 @@ class UserLlmCredentials(BaseModel):
     model: str = Field(..., min_length=1, description="chat completions 模型 id")
 
 
+class WeChatLoginBody(BaseModel):
+    """微信小程序 wx.login 拿到的 code，服务端换取 openid 并签发 JWT。"""
+
+    code: str = Field(..., min_length=1)
+
+
+class WeChatLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
 class DailyPicksResponse(BaseModel):
     date: str
     items: list[PaperOut]
