@@ -1,13 +1,5 @@
 <scroll-view scroll-y class="page">
   <view class="section">
-    <text class="h">文献服务器</text>
-    <text class="p">填写文献服务根地址（https 域名，如 https://cppteam.cn），勿带 /api/v1。留空则用内置默认，与 Android 一致。</text>
-    <input class="input" placeholder="{{apiDefaultPlaceholder}}" value="{{apiBase}}" bindinput="onApiBase" />
-    <button class="btn" bindtap="applyApi">应用后端地址</button>
-    <text wx:if="{{apiHint}}" class="hint">{{apiHint}}</text>
-  </view>
-
-  <view class="section">
     <text class="h">大模型（BYOK）</text>
     <text class="p">端上要点直连模型商。保存本机后若填写了 Key，会尝试同步到文献服务器以启用每日精选与推荐一句话摘要（须可信服务）。</text>
     <picker mode="selector" range="{{providers}}" range-key="label" value="{{providerIndex}}" bindchange="onProvider">

@@ -30,7 +30,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.literatureradar.app.R
 import com.literatureradar.app.util.NetworkErrorHumanizer
 import com.literatureradar.app.ServiceLocator
 import com.literatureradar.app.data.UserLlmCredentialsBody
@@ -70,8 +69,6 @@ fun SettingsScreen(
 
     var providerMenu by remember { mutableStateOf(false) }
 
-    var serverUrl by remember { mutableStateOf(AppPrefs.getApiBaseUrl(ctx)) }
-    var backendHint by remember { mutableStateOf<String?>(null) }
     var llmHint by remember { mutableStateOf<String?>(null) }
     var dailyLlmHint by remember { mutableStateOf<String?>(null) }
     val scope = remember { CoroutineScope(Dispatchers.Main) }
@@ -94,48 +91,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("文献服务器", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "填写文献服务根地址：使用 https 域名（如 https://cppteam.cn），可省略协议则默认补 https；勿带 /api/v1。Debug 构建若未填写则使用工程内默认。修改后点「应用」。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = serverUrl,
-                onValueChange = { serverUrl = it },
-                label = { Text("API Base URL") },
-                placeholder = { Text(ctx.getString(R.string.api_base_url)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = false,
-                minLines = 2,
-            )
-            Button(
-                onClick = {
-                    val u = serverUrl.trim()
-                    val norm = AppPrefs.normalizeApiBaseUrl(u)
-                    if (u.isNotBlank() && norm.isEmpty()) {
-                        backendHint = "地址无效。请填写域名根地址，例如 https://cppteam.cn（勿带 /api/v1）"
-                        return@Button
-                    }
-                    val beforeNorm = u
-                    AppPrefs.setApiBaseUrl(ctx, u)
-                    serverUrl = AppPrefs.getApiBaseUrl(ctx)
-                    ServiceLocator.rebuildNetworkIfNeeded()
-                    DigestScheduler.schedule(ctx)
-                    backendHint = when {
-                        beforeNorm.isNotBlank() &&
-                            beforeNorm.replace(Regex("\\s+"), "").trimEnd('/').lowercase() != norm.lowercase() ->
-                            "已应用；已规范为 $norm"
-                        norm.isNotBlank() -> "已应用后端地址"
-                        else -> "已清空；将使用默认地址"
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("应用后端地址")
-            }
-            backendHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-
             Text("大模型（BYOK）", style = MaterialTheme.typography.titleMedium)
             Text(
                 "端上「生成中文要点」直连模型商。若要点「每日精选」与「推荐里的一句话摘要」走服务端，需在保存时把 Key 同步到你信任的文献服务器（见下方说明）。",

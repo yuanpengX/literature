@@ -10,9 +10,6 @@ const PROVIDERS = [
 
 Page({
   data: {
-    apiBase: '',
-    apiDefaultPlaceholder: '',
-    apiHint: '',
     providers: PROVIDERS,
     providerIndex: 0,
     llmModel: '',
@@ -22,55 +19,15 @@ Page({
   },
 
   onShow() {
-    let raw = api.getBaseUrlRaw()
-    if (raw) {
-      const fixed = api.canonicalizeLiteratureApiBase(raw)
-      if (fixed && fixed !== raw) {
-        api.setBaseUrl(fixed)
-        raw = fixed
-      }
-    }
     const c = llm.getLlmConfig()
     const idx = Math.max(0, PROVIDERS.findIndex((p) => p.id === c.providerId))
     const pid = PROVIDERS[idx].id
     this.setData({
-      apiBase: raw ? api.canonicalizeLiteratureApiBase(raw) || raw : '',
-      apiDefaultPlaceholder: api.DEFAULT_BASE_URL,
       providerIndex: idx,
       llmModel: c.model || llm.defaultModel(pid),
       llmBase: c.baseUrl || '',
       llmKey: c.apiKey || '',
       llmHint: '',
-      apiHint: '',
-    })
-  },
-
-  onApiBase(e) {
-    this.setData({ apiBase: e.detail.value })
-  },
-
-  applyApi() {
-    const u = (this.data.apiBase || '').trim()
-    if (!u) {
-      api.setBaseUrl('')
-      this.setData({
-        apiBase: '',
-        apiHint: '已清空；将使用内置默认 ' + api.DEFAULT_BASE_URL,
-      })
-      return
-    }
-    const norm = api.canonicalizeLiteratureApiBase(u)
-    if (!norm) {
-      this.setData({
-        apiHint:
-          '地址无效。请填写文献服务根地址，例如 https://cppteam.cn（勿手写 IP 拼接、勿带 /api/v1）',
-      })
-      return
-    }
-    api.setBaseUrl(norm)
-    this.setData({
-      apiBase: norm,
-      apiHint: '已保存：' + norm + '；请重新进入各页加载数据',
     })
   },
 
