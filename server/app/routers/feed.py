@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -131,6 +132,7 @@ def get_feed(
             blurbs_llm_ready=False,
         )
 
+    t0 = time.monotonic()
     page, next_idx = collect_feed_items_with_blurbs(
         db,
         user_id,
@@ -140,6 +142,26 @@ def get_feed(
         abstract_enrich_enabled=settings.abstract_enrich_enabled,
         max_scan_multiplier=settings.feed_llm_ensure_max_scan_multiplier,
     )
+    elapsed = time.monotonic() - t0
+    if elapsed >= 25.0:
+        logger.warning(
+            "feed collect slow user=%s channel=%s limit=%s items=%s ordered=%s elapsed=%.2fs (LLM/摘要补全在请求内同步)",
+            user_id[:32] if user_id else "",
+            ch,
+            limit,
+            len(page),
+            len(ordered),
+            elapsed,
+        )
+    else:
+        logger.info(
+            "feed collect ok user=%s channel=%s limit=%s items=%s elapsed=%.2fs",
+            user_id[:32] if user_id else "",
+            ch,
+            limit,
+            len(page),
+            elapsed,
+        )
     next_cursor = str(next_idx) if next_idx < len(ordered) else None
 
     return FeedResponse(

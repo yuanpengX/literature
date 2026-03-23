@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 BLURB_MAX = 680
 BATCH_MAX = 10
+_SYNC_BLURB_CAP = 32  # 单批 LLM 论文数硬上限，避免 prompt 过大
 
 
 def _normalize_llm_base(url: str) -> str:
@@ -127,7 +128,7 @@ def ensure_blurbs_for_user_papers(
     paper_ids: list[int],
     *,
     max_rounds: int = 48,
-    batch_size: int = BATCH_MAX,
+    batch_size: int | None = None,
 ) -> None:
     """
     同步多轮调用 LLM，尽力为 paper_ids 中缺失的条目写入 blurb（每轮最多 batch_size 篇）。
@@ -142,13 +143,14 @@ def ensure_blurbs_for_user_papers(
         or not (user.llm_model or "").strip()
     ):
         return
+    bs = BATCH_MAX if batch_size is None else max(1, min(int(batch_size), 32))
     stagnant = 0
     for _ in range(max_rounds):
         existing = load_blurbs_for_papers(db, user_id, paper_ids)
         missing = [pid for pid in paper_ids if pid not in existing]
         if not missing:
             return
-        n = generate_missing_blurbs_for_user(db, user_id, missing, max_papers=batch_size)
+        n = generate_missing_blurbs_for_user(db, user_id, missing, max_papers=bs)
         if n <= 0:
             stagnant += 1
             if stagnant >= 4:
@@ -176,8 +178,15 @@ def collect_feed_items_with_blurbs(
     mult = max(1, int(max_scan_multiplier))
     max_scan = min(len(ordered), idx + max(limit * mult, limit + 5))
 
+    sync_cap = max(BATCH_MAX, min(int(settings.feed_llm_blurb_sync_max), _SYNC_BLURB_CAP))
+
     while len(out) < limit and idx < max_scan:
-        batch_end = min(idx + BATCH_MAX, len(ordered))
+        # 首屏首批拉大 batch，减少 LLM 往返（每日精选为单次调用，Feed 原先每批 10 篇易超时）
+        if not out:
+            chunk = min(sync_cap, len(ordered) - idx, max(limit, BATCH_MAX))
+        else:
+            chunk = BATCH_MAX
+        batch_end = min(idx + max(chunk, 1), len(ordered))
         batch = ordered[idx:batch_end]
         if not batch:
             break
@@ -185,7 +194,7 @@ def collect_feed_items_with_blurbs(
         if abstract_enrich_enabled:
             enrich_papers_for_feed_ids(db, ids)
             refresh_feed_items_abstracts(db, batch)
-        ensure_blurbs_for_user_papers(db, user_id, ids)
+        ensure_blurbs_for_user_papers(db, user_id, ids, batch_size=len(ids))
         merge_blurbs_into_feed_items(db, user_id, batch)
         advance = 0
         filled_limit = False

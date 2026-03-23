@@ -66,6 +66,8 @@ def _purge_job() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _scheduler
+    # uvicorn 完成日志初始化后再调，否则 root 级别可能挡住 app 的 INFO
+    logging.getLogger("app").setLevel(logging.INFO)
     Base.metadata.create_all(bind=engine)
     ensure_papers_schema(engine)
     ensure_user_llm_columns(engine)

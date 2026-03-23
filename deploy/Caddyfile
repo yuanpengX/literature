@@ -4,5 +4,12 @@
 {$LITERATURE_DOMAIN}, www.{$LITERATURE_DOMAIN} {
 	tls {$CADDY_TLS_CERT} {$CADDY_TLS_KEY}
 	encode gzip zstd
-	reverse_proxy literature-api:8000
+	# Feed 首屏可能多轮用户 LLM + 摘要补全，默认 60s 易被掐断
+	reverse_proxy literature-api:8000 {
+		transport http {
+			dial_timeout 10s
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
 }
