@@ -3,9 +3,10 @@
 # 系统依赖（JDK 等）请先执行（一次即可）：sudo bash scripts/install-android-build-deps-root.sh
 # 可用 root 或普通用户运行；root 时默认 ANDROID_HOME=/root/android-sdk。
 #
-# 双核 / 约 4G 内存：与 android/gradle.properties 中的堆上限、workers、Kotlin daemon 配合；
-# 本脚本对 Gradle 再强制 --max-workers=1。若仍 OOM，请先加 swap 或减少同时运行的服务。
-# 机器更强时可设 GRADLE_LOW_MEM=0 去掉额外 worker 限制（仍建议保留 gradle.properties 按需调大内存）。
+# 目标环境：2 核 2G 内存 VPS。与 android/gradle.properties（约 896M Gradle 堆 + in-process Kotlin）一致；
+# 脚本侧：--no-daemon、默认 --max-workers=1，减少峰值内存。
+# 若仍 OOM：先加 swap（建议 ≥2G），并停掉 Docker 等占内存服务后再打包。
+# 机器更强时可设 GRADLE_LOW_MEM=0 允许 Gradle 使用 gradle.properties 里的 workers.max（仍勿在 2G 上并行过大）。
 set -euo pipefail
 
 GRADLE_LOW_MEM="${GRADLE_LOW_MEM:-1}"
@@ -55,6 +56,7 @@ gradlew_args=(--no-daemon)
 if [[ "$GRADLE_LOW_MEM" == "1" ]]; then
   gradlew_args+=(--max-workers=1)
 fi
+# JVM/并行策略以 android/gradle.properties 为准（2 核 2G  profile）
 ./gradlew "${gradlew_args[@]}" assembleRelease
 
 # Gradle 会将 APK 同步到 android/apk/（浅路径）；否则回退默认输出目录
