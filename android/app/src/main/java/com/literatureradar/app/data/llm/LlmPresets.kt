@@ -9,6 +9,7 @@ data class LlmPreset(
     val suggestedModels: List<String>,
 )
 
+/** 预设列表与微信小程序 `miniprogram/utils/llm.js` 中 PRESETS 保持一致。 */
 object LlmPresets {
     val all: List<LlmPreset> = listOf(
         LlmPreset(

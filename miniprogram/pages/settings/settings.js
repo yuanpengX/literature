@@ -1,15 +1,17 @@
 const api = require('../../utils/api.js')
 const llm = require('../../utils/llm.js')
 
+// 与 Android LlmPresets.all 顺序、文案一致
 const PROVIDERS = [
   { id: 'deepseek', label: 'DeepSeek' },
-  { id: 'openai', label: 'OpenAI' },
-  { id: 'moonshot', label: 'Moonshot' },
+  { id: 'moonshot', label: 'Kimi (Moonshot)' },
+  { id: 'custom', label: '自定义 Base URL' },
 ]
 
 Page({
   data: {
     apiBase: '',
+    apiDefaultPlaceholder: '',
     apiHint: '',
     providers: PROVIDERS,
     providerIndex: 0,
@@ -22,14 +24,13 @@ Page({
   onShow() {
     const raw = api.getBaseUrlRaw()
     const c = llm.getLlmConfig()
-    const idx = Math.max(
-      0,
-      PROVIDERS.findIndex((p) => p.id === c.providerId),
-    )
+    const idx = Math.max(0, PROVIDERS.findIndex((p) => p.id === c.providerId))
+    const pid = PROVIDERS[idx].id
     this.setData({
-      apiBase: raw || '',
-      providerIndex: idx < 0 ? 0 : idx,
-      llmModel: c.model || llm.defaultModel(PROVIDERS[idx < 0 ? 0 : idx].id),
+      apiBase: raw,
+      apiDefaultPlaceholder: api.DEFAULT_BASE_URL,
+      providerIndex: idx,
+      llmModel: c.model || llm.defaultModel(pid),
       llmBase: c.baseUrl || '',
       llmKey: c.apiKey || '',
       llmHint: '',
@@ -45,7 +46,9 @@ Page({
     const u = (this.data.apiBase || '').trim()
     api.setBaseUrl(u)
     this.setData({
-      apiHint: u ? '已保存；请重新进入各页加载数据' : '已清空，将使用 utils/api 内默认地址',
+      apiHint: u
+        ? '已保存；请重新进入各页加载数据'
+        : '已清空；将使用与 Android strings.xml 相同的内置默认（见 utils/api.js）',
     })
   },
 
@@ -95,6 +98,10 @@ Page({
       return
     }
     const root = llm.resolveBaseRoot(c.providerId, c.baseUrl)
+    if (!root) {
+      wx.showToast({ title: '自定义模型商需填写 Base URL', icon: 'none' })
+      return
+    }
     const model = (c.model || '').trim() || llm.defaultModel(c.providerId)
     try {
       await api.putLlmCredentials({

@@ -1,7 +1,8 @@
 /**
  * 与 Android LiteratureApi 对齐；Base URL 勿含 /api/v1
+ * 内置默认与 android/app/src/main/res/values/strings.xml 中 api_base_url 保持一致（修改时请两处同步）
  */
-const DEFAULT_BASE_URL = 'https://example.com'
+const DEFAULT_BASE_URL = 'http://150.158.141.175:8000'
 
 function ensureUserId() {
   let id = wx.getStorageSync('user_id')
@@ -12,10 +13,10 @@ function ensureUserId() {
   return id
 }
 
+/** 用户覆盖项（同 Android AppPrefs.getApiBaseUrl）；为空表示使用 DEFAULT_BASE_URL */
 function getBaseUrlRaw() {
   const u = wx.getStorageSync('api_base_url')
-  if (u && String(u).trim()) return String(u).trim()
-  return DEFAULT_BASE_URL
+  return u && String(u).trim() ? String(u).trim() : ''
 }
 
 function normalizeBaseUrl(raw) {
@@ -36,7 +37,8 @@ function normalizeBaseUrl(raw) {
 }
 
 function getBaseUrl() {
-  return normalizeBaseUrl(getBaseUrlRaw())
+  const raw = getBaseUrlRaw() || DEFAULT_BASE_URL
+  return normalizeBaseUrl(raw)
 }
 
 function setBaseUrl(url) {
@@ -46,8 +48,8 @@ function setBaseUrl(url) {
 
 function request(path, method, data) {
   const base = getBaseUrl()
-  if (!base || base === 'https://example.com') {
-    return Promise.reject(new Error('请先在「设置」填写文献 API 根地址'))
+  if (!base) {
+    return Promise.reject(new Error('文献 API 根地址无效'))
   }
   const url = base + path
   return new Promise((resolve, reject) => {

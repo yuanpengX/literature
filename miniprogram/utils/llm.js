@@ -1,10 +1,43 @@
 /**
- * 端上 OpenAI 兼容摘要（与 Android LlmClient 行为类似）
+ * 端上 OpenAI 兼容摘要（与 Android LlmSecureStore + LlmPresets 对齐）
  * 正式环境需在小程序后台配置 request 合法域名（模型商域名）
  */
+
+// 与 android/.../data/llm/LlmPresets.kt 保持同步（修改时请两处对齐）
+const PRESETS = {
+  deepseek: {
+    defaultBaseUrl: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+  },
+  moonshot: {
+    defaultBaseUrl: 'https://api.moonshot.cn/v1',
+    defaultModel: 'moonshot-v1-8k',
+  },
+  custom: {
+    defaultBaseUrl: '',
+    defaultModel: 'gpt-4o-mini',
+  },
+}
+
+function migrateLegacyProviderId() {
+  let id = wx.getStorageSync('llm_provider') || 'deepseek'
+  if (id === 'openai') {
+    const b = (wx.getStorageSync('llm_base_url') || '').trim()
+    if (!b) wx.setStorageSync('llm_base_url', 'https://api.openai.com/v1')
+    wx.setStorageSync('llm_provider', 'custom')
+    id = 'custom'
+  }
+  if (!PRESETS[id]) {
+    id = 'deepseek'
+    wx.setStorageSync('llm_provider', id)
+  }
+  return id
+}
+
 function getLlmConfig() {
+  const providerId = migrateLegacyProviderId()
   return {
-    providerId: wx.getStorageSync('llm_provider') || 'deepseek',
+    providerId,
     baseUrl: wx.getStorageSync('llm_base_url') || '',
     apiKey: wx.getStorageSync('llm_api_key') || '',
     model: wx.getStorageSync('llm_model') || '',
@@ -19,23 +52,15 @@ function setLlmConfig(c) {
 }
 
 function defaultModel(providerId) {
-  const m = {
-    deepseek: 'deepseek-chat',
-    openai: 'gpt-4o-mini',
-    moonshot: 'moonshot-v1-8k',
-  }
-  return m[providerId] || 'deepseek-chat'
+  const p = PRESETS[providerId]
+  return (p && p.defaultModel) || PRESETS.deepseek.defaultModel
 }
 
 function resolveBaseRoot(providerId, override) {
   const o = (override || '').trim().replace(/\/+$/, '')
   if (o) return o
-  const presets = {
-    deepseek: 'https://api.deepseek.com/v1',
-    openai: 'https://api.openai.com/v1',
-    moonshot: 'https://api.moonshot.cn/v1',
-  }
-  return presets[providerId] || presets.deepseek
+  const p = PRESETS[providerId] || PRESETS.deepseek
+  return (p.defaultBaseUrl || '').trim().replace(/\/+$/, '')
 }
 
 function summarizePaperChinese(title, abstract, cb) {
@@ -46,6 +71,10 @@ function summarizePaperChinese(title, abstract, cb) {
     return
   }
   const root = resolveBaseRoot(providerId, baseUrl)
+  if (!root) {
+    cb(new Error('请填写自定义 Base URL（需指向 OpenAI 兼容 /v1）'))
+    return
+  }
   const mid = (model || '').trim() || defaultModel(providerId)
   const url = root + '/chat/completions'
   const body = {
@@ -87,6 +116,7 @@ function summarizePaperChinese(title, abstract, cb) {
 }
 
 module.exports = {
+  PRESETS,
   getLlmConfig,
   setLlmConfig,
   defaultModel,
