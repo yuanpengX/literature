@@ -79,7 +79,7 @@ Page({
       await api.fetchServerHttpIpBase()
       api.setUseServerIp(true)
       this.setData({ useServerIp: true })
-      wx.showToast({ title: '已启用 IP', icon: 'success' })
+      wx.showToast({ title: '已启用直连', icon: 'success' })
     } catch (err) {
       this.setData({ useServerIp: false })
       wx.showToast({

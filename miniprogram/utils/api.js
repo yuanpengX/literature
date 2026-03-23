@@ -220,7 +220,7 @@ function normalizeBaseUrl(raw) {
   return canonicalizeLiteratureApiBase(raw)
 }
 
-/** 域名模式下的根地址（用于拉取 /config/client；不受「IP 开关」影响） */
+/** 域名模式下的根地址（用于拉取 /config/client；不受「直连开关」影响） */
 function getDomainBaseUrl() {
   const raw = getBaseUrlRaw() || DEFAULT_BASE_URL
   return canonicalizeLiteratureApiBase(raw) || canonicalizeLiteratureApiBase(DEFAULT_BASE_URL) || ''
@@ -320,7 +320,7 @@ function wxRequestFailHints(errMsg, fullUrl) {
   if (/timeout|超时/i.test(s)) {
     if (/ERR_CONNECTION|net::ERR_CONNECTION|TIMED_OUT.*CONNECTION|连接超时/i.test(s)) {
       parts.push(
-        '连接阶段超时：多为 DNS、运营商网络、安全组未放行 443，或「IP 直连」地址已失效；可关闭 IP 开关仅用 HTTPS 域名',
+        '连接阶段超时：多为 DNS、运营商网络、安全组未放行 443，或服务端直连基址失效；可关闭直连开关仅用 HTTPS 域名',
       )
     } else {
       parts.push('若已能打开 /health：可能是单次请求耗时过长（如 Feed 多轮摘要），已延长客户端超时，仍失败可稍后再试')

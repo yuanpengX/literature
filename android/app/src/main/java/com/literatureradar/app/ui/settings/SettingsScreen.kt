@@ -98,7 +98,7 @@ fun SettingsScreen(
         ) {
             Text("文献 API 根地址", style = MaterialTheme.typography.titleMedium)
             Text(
-                "默认走 HTTPS 域名（与 strings.xml 一致，可下方覆盖）。开启「IP」后使用服务端 server/.env 的 LITERATURE_HTTP_IP_BASE，需先能访问域名以拉取配置。",
+                "默认走 HTTPS 域名（与 strings.xml 一致，可下方覆盖）。生产以 HTTPS 为准。开启「直连」后使用 server/.env 的 LITERATURE_HTTP_IP_BASE（建议 https://，须配置合法域名）。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -127,9 +127,9 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("使用服务端 IP（HTTP）", style = MaterialTheme.typography.bodyLarge)
+                    Text("使用服务端直连（备用）", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "从 /api/v1/config/client 读取；真机 HTTP 可能受系统限制。",
+                        "从 /api/v1/config/client 读取；真机请优先 HTTPS。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -145,7 +145,7 @@ fun SettingsScreen(
                             return@Switch
                         }
                         scope.launch {
-                            apiBaseHint = "正在拉取 IP 配置…"
+                            apiBaseHint = "正在拉取直连配置…"
                             val domainRoot =
                                 AppPrefs.normalizeApiBaseUrl(
                                     AppPrefs.getApiBaseUrl(ctx).ifBlank { ctx.getString(R.string.api_base_url) },
@@ -165,7 +165,7 @@ fun SettingsScreen(
                             AppPrefs.setUseServerIpBase(ctx, true)
                             useServerIp = true
                             ServiceLocator.rebuildNetworkIfNeeded()
-                            apiBaseHint = "已启用 IP：$ip"
+                            apiBaseHint = "已启用直连：$ip"
                         }
                     },
                 )
@@ -196,7 +196,7 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("从服务器刷新 IP 根地址")
+                    Text("从服务器刷新直连根地址")
                 }
             }
             apiBaseHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }

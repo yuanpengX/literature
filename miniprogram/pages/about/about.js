@@ -1,5 +1,6 @@
-const PRIVACY = 'http://47.103.51.214/privacy'
-const TERMS = 'http://47.103.51.214/terms'
+/** 与 Android strings.xml 的 url_privacy_policy / url_terms 保持一致 */
+const PRIVACY = 'https://cppteam.cn/privacy'
+const TERMS = 'https://cppteam.cn/terms'
 
 Page({
   copyPrivacy() {

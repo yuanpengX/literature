@@ -1,14 +1,14 @@
 <scroll-view scroll-y class="page">
   <view class="section">
     <text class="h">文献 API</text>
-    <text class="p">默认与打包 DEFAULT_BASE_URL 一致；下方可填 HTTPS 根地址覆盖（勿含 /api/v1）。开启「IP」后使用服务端 server/.env 的 LITERATURE_HTTP_IP_BASE，须先能访问域名以拉取配置；真机 HTTP 受合法域名与系统策略限制。</text>
+    <text class="p">默认与打包 DEFAULT_BASE_URL 一致；下方可填 HTTPS 根地址覆盖（勿含 /api/v1）。生产与真机请以 HTTPS 域名为准（443）。开启「直连」后使用 server/.env 的 LITERATURE_HTTP_IP_BASE（建议同样为 https://，须在微信公众平台配置 request 合法域名）。</text>
     <input class="input" placeholder="HTTPS 域名根地址（可选）" value="{{apiDomainInput}}" bindinput="onApiDomainInput" />
     <button class="btn-light" bindtap="saveApiDomain">保存域名</button>
     <view class="row-switch">
-      <text class="row-switch-label">使用服务端 IP（HTTP）</text>
+      <text class="row-switch-label">使用服务端直连（备用）</text>
       <switch checked="{{useServerIp}}" bindchange="onServerIpSwitch" />
     </view>
-    <button wx:if="{{useServerIp}}" class="btn-light" bindtap="refreshServerIp">从服务器刷新 IP</button>
+    <button wx:if="{{useServerIp}}" class="btn-light" bindtap="refreshServerIp">从服务器刷新直连地址</button>
   </view>
 
   <view class="section">

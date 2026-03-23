@@ -1,4 +1,4 @@
-"""客户端公开配置（无需鉴权）：供 App 在「域名 / 服务端下发的 IP 根地址」间切换。"""
+"""客户端公开配置（无需鉴权）：供端上在「HTTPS 域名 / 服务端下发的直连根地址」间切换。"""
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/config", tags=["config"])
 class ClientConfigOut(BaseModel):
     http_ip_base: str = Field(
         default="",
-        description="服务端配置的 HTTP(S) 根地址（通常为公网 IP:80），空表示未配置",
+        description="服务端配置的 API 根地址（生产建议 https://），空表示未配置",
     )
 
 

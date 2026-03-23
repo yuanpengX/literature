@@ -17,7 +17,7 @@ paths:
           description: OK
   /api/v1/config/client:
     get:
-      summary: 客户端公开配置（含可选 IP 根地址）
+      summary: 客户端公开配置（含可选直连根地址，生产建议 HTTPS）
       responses:
         "200":
           description: http_ip_base

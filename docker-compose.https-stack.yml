@@ -12,7 +12,7 @@
 # 验证：curl https://<LITERATURE_DOMAIN>/health
 # 小程序 / Android：API 根地址为 https://<LITERATURE_DOMAIN>（无尾斜杠、无 /api/v1）
 #
-# 本地 HTTP：根目录 docker-compose.yml 将宿主机 80 映射到 API（http://localhost/health）
+# 仅本地调试：根目录 docker-compose.yml 可将宿主机 80 映射到 API（http://localhost/health）；生产以本 HTTPS 栈为准
 
 services:
   literature-api:

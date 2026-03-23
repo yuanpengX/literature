@@ -7,7 +7,7 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 /**
- * 通过当前可访问的「域名根地址」拉取服务端 [LITERATURE_HTTP_IP_BASE]（无需鉴权）。
+ * 通过当前可访问的「HTTPS 域名根」拉取服务端 [LITERATURE_HTTP_IP_BASE] 直连备用根地址（无需鉴权）。
  */
 object LiteratureClientConfigFetcher {
     private val json = Json { ignoreUnknownKeys = true }

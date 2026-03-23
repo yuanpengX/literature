@@ -44,14 +44,14 @@ cp server/.env.example server/.env   # 按需填写密钥等
 docker compose -f docker-compose.https-stack.yml up -d --build
 ```
 
-- 对外根地址：`https://<LITERATURE_DOMAIN>`（**443**，勿写端口；例 `https://47.103.51.214/health`，纯 IP 部署更常用根目录 `docker-compose.yml` 的 **HTTP 80**）
-- 客户端：将 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 的 `DEFAULT_BASE_URL` 与 [`android/.../strings.xml`](android/app/src/main/res/values/strings.xml) 的 `api_base_url` 设为同一 **API 根地址**（无尾斜杠、无 `/api/v1`；HTTPS 栈用 `https://`，纯 IP HTTP 用 `http://47.103.51.214`）
+- 对外根地址：`https://<LITERATURE_DOMAIN>`（**443**，勿写端口；例 `https://cppteam.cn/health`）。生产默认已全部走 **HTTPS**（`docker-compose.https-stack.yml` + Caddy）。
+- 客户端：将 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 的 `DEFAULT_BASE_URL` 与 [`android/.../strings.xml`](android/app/src/main/res/values/strings.xml) 的 `api_base_url` 设为同一 **HTTPS API 根地址**（无尾斜杠、无 `/api/v1`）。可选 `LITERATURE_HTTP_IP_BASE` 作为直连备用，**建议同样为 `https://`**，且域名须加入公众平台 request 合法域名。
 - 微信公众平台 → **服务器域名** → request 合法域名填你的 **https 域名**（不要带路径）
 - 从旧部署升级时：若仅有 `LITERATURE_DOMAIN`，请在 `https.env` 中**补充** `ACME_EMAIL`
 
 **说明**：[`deploy/Caddyfile`](deploy/Caddyfile) 使用全局 `email` 与站点反代；API 镜像内 **uvicorn** 已加 `--proxy-headers`，以便正确识别 `X-Forwarded-Proto` 等。若 Let’s Encrypt 不可用，可自行改写 `deploy/Caddyfile` 使用 `tls` 挂载云厂商证书（见 Caddy 文档）。
 
-### 本地 / 内网：HTTP 默认端口 80
+### 可选：本地 / 内网仅用 HTTP（端口 80）
 
 在项目根目录：
 
