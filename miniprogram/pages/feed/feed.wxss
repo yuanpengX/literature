@@ -27,6 +27,11 @@
   font-weight: 600;
 }
 
+.tabs-sort {
+  border-bottom: none;
+  padding-top: 0;
+}
+
 .list-wrap {
   padding: 24rpx;
 }

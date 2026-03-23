@@ -17,6 +17,19 @@
     >会议</view>
   </view>
 
+  <view class="tabs tabs-sort">
+    <view
+      class="tab {{sort === 'recommended' ? 'tab-on' : ''}}"
+      data-sort="recommended"
+      bindtap="onSort"
+    >综合</view>
+    <view
+      class="tab {{sort === 'hot' ? 'tab-on' : ''}}"
+      data-sort="hot"
+      bindtap="onSort"
+    >热门</view>
+  </view>
+
   <view wx:if="{{loading && items.length === 0}}" class="center">
     <text>加载中…</text>
   </view>
