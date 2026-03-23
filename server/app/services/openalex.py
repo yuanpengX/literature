@@ -20,6 +20,16 @@ logger = logging.getLogger(__name__)
 OPENALEX_WORKS = "https://api.openalex.org/works"
 
 
+def _openalex_base_params() -> dict[str, str]:
+    """mailto 必填礼貌参数；api_key 可选，官方建议规模化使用时携带。"""
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    out: dict[str, str] = {"mailto": mailto}
+    key = (settings.openalex_api_key or "").strip()
+    if key:
+        out["api_key"] = key
+    return out
+
+
 def _reconstruct_abstract(inv: dict | None) -> str:
     if not inv:
         return ""
@@ -172,7 +182,7 @@ def _openalex_fetch_results(filter_str: str) -> list:
         "filter": filter_str,
         "per_page": min(max(settings.openalex_per_page, 1), 200),
         "sort": "publication_date:desc",
-        "mailto": mailto,
+        **_openalex_base_params(),
     }
     headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
     with httpx.Client(timeout=90.0, headers=headers) as client:
@@ -219,6 +229,7 @@ def fetch_and_upsert_openalex_for_source_ids(db: Session, source_ids: list[str])
     d = date.today() - timedelta(days=settings.openalex_lookback_days)
     per = min(max(settings.openalex_subscription_per_source, 1), 200)
     mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    base_q = _openalex_base_params()
     headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
     for raw in source_ids:
         sid = normalize_openalex_source_id(raw)
@@ -238,7 +249,7 @@ def fetch_and_upsert_openalex_for_source_ids(db: Session, source_ids: list[str])
             "filter": filt,
             "per_page": per,
             "sort": "publication_date:desc",
-            "mailto": mailto,
+            **base_q,
         }
         try:
             with httpx.Client(timeout=90.0, headers=headers) as client:
@@ -265,6 +276,7 @@ def enrich_arxiv_citations(db: Session) -> int:
     if not settings.openalex_enabled or not settings.openalex_enrich_arxiv_citations:
         return 0
     mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "dev@example.com"
+    base_q = _openalex_base_params()
     headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
     limit = min(max(settings.openalex_enrich_per_run, 1), 100)
     pool = min(max(settings.openalex_enrich_pool, limit), 500)
@@ -288,7 +300,7 @@ def enrich_arxiv_citations(db: Session) -> int:
                 continue
             api_path = quote(abs_url, safe="")
             try:
-                r = client.get(f"{OPENALEX_WORKS}/{api_path}", params={"mailto": mailto})
+                r = client.get(f"{OPENALEX_WORKS}/{api_path}", params=base_q)
                 if r.status_code == 404:
                     p.citation_count = 0
                     p.citation_synced_at = datetime.now(timezone.utc)

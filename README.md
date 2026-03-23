@@ -16,7 +16,7 @@ Monorepo：**Android 客户端** + **FastAPI 后端**。当前已实现：arXiv 
 | **大模型 API** | 设置里 **DeepSeek**、**Kimi（Moonshot）** 等为**国内可直连**的 OpenAI 兼容接口；请勿把 Key 发到本应用后端。 |
 | **系统推送** | **未集成**需谷歌服务的 FCM 推送链路；日常依赖 **WorkManager + 本地通知**。若将来接 FCM，仅适合有 GMS 或海外用户。 |
 | **arXiv 抓取** | 服务端访问 `export.arxiv.org`，部分网络环境可能较慢；可在 [`docker-compose.yml`](docker-compose.yml) 中为容器配置 **`HTTP_PROXY` / `HTTPS_PROXY`**（`httpx` 会读取环境变量），或在你侧网络做透明代理。 |
-| **OpenAlex** | 默认关闭（`OPENALEX_ENABLED=false`）。开启后需容器能访问 **`api.openalex.org`**；可在 [`server/docker-compose.example.env`](server/docker-compose.example.env) 配置回溯天数、可选 **venue Source ID**（会议/期刊轨道）、以及是否回填 arXiv 论文的引用数。 |
+| **OpenAlex** | 默认关闭（`OPENALEX_ENABLED=false`）。开启后需容器能访问 **`api.openalex.org`**，并在 [`server/.env.example`](server/.env.example) 中填写 **`OPENALEX_API_KEY`**（[openalex.org/settings/api](https://openalex.org/settings/api) 免费申请）；另可配置回溯天数、可选 **venue Source ID**、是否回填 arXiv 引用数（见 [`server/docker-compose.example.env`](server/docker-compose.example.env)）。 |
 | **Docker 基础镜像** | `python:3.12-slim` 从 Docker Hub 拉取，国内请配置 **镜像加速**（阿里云、DaoCloud、`dockerproxy.com` 等）后再 `docker compose build`。 |
 
 ---
