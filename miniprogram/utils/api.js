@@ -3,7 +3,7 @@
  * 小程序：微信登录后使用 Authorization Bearer；不再发送本地随机 X-User-Id
  * 内置默认与 android/.../strings.xml 中 api_base_url 保持一致（修改时请两处同步）
  */
-const DEFAULT_BASE_URL = 'https://api.example.com'
+const DEFAULT_BASE_URL = 'https://cppteam.cn'
 const TOKEN_KEY = 'mp_access_token'
 
 function getToken() {

@@ -2,8 +2,8 @@
     <string name="app_name">文献雷达</string>
     <!-- 生产：与 miniprogram/utils/api.js 中 DEFAULT_BASE_URL 一致，填 https://你的 API 域名（无路径） -->
     <!-- 模拟器连本机 Docker：可改为 http://10.0.2.2:8000 -->
-    <string name="api_base_url">https://api.example.com</string>
-    <!-- 关于页外链：请替换为你的正式合规页面 -->
-    <string name="url_privacy_policy">https://example.com/privacy</string>
-    <string name="url_terms">https://example.com/terms</string>
+    <string name="api_base_url">https://cppteam.cn</string>
+    <!-- 关于页外链：若尚未上线请替换为实际 URL -->
+    <string name="url_privacy_policy">https://cppteam.cn/privacy</string>
+    <string name="url_terms">https://cppteam.cn/terms</string>
 </resources>
