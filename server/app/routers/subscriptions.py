@@ -14,6 +14,7 @@ from app.catalog.presets import (
     default_subscription_conferences,
     default_subscription_journals,
     default_subscription_keywords,
+    keywords_csv_from_subscription_json,
 )
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
