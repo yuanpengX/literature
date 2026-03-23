@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.catalog.presets import (
@@ -18,7 +18,7 @@ from app.catalog.presets import (
 )
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
-from app.services.ingest import run_ingestion_standalone
+from app.services.ingest import run_ingestion_standalone, run_ingestion_standalone_for_channel
 from app.services.user_defaults import default_subscription_tuple
 from app.schemas import (
     ConferencePresetOut,
@@ -164,10 +164,20 @@ def get_subscription_catalog():
 def get_subscription_fetch_now(
     user_id: Annotated[str, Depends(current_user_id)],
     background_tasks: BackgroundTasks,
+    channel: str | None = Query(
+        None,
+        description="arxiv | journal | conference：仅抓取当前频道相关源；省略则全量（与定时任务相同）",
+    ),
 ):
-    """手动触发一次全库抓取（合并所有用户的期刊 RSS、会议 OpenAlex 等）。与定时任务相同逻辑。"""
+    """手动触发抓取；带 channel 时只更新对应频道数据源，避免下拉刷新拉全库。"""
     _ = user_id
-    background_tasks.add_task(run_ingestion_standalone)
+    raw = (channel or "").strip().lower()
+    if raw and raw not in ("arxiv", "journal", "conference"):
+        raise HTTPException(status_code=400, detail="channel 须为 arxiv、journal、conference 或省略")
+    if raw:
+        background_tasks.add_task(run_ingestion_standalone_for_channel, raw)
+    else:
+        background_tasks.add_task(run_ingestion_standalone)
     return {"ok": True}
 
 

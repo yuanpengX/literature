@@ -58,5 +58,8 @@ interface LiteratureApi {
     suspend fun putMySubscriptions(@Body body: UserSubscriptionsJson): UserSubscriptionsJson
 
     @GET(ApiV1Paths.USERS_ME_SUBSCRIPTIONS_FETCH_NOW)
-    suspend fun requestSubscriptionFetch(): PreferencesOkJson
+    suspend fun requestSubscriptionFetch(
+        /** arxiv | journal | conference：仅抓取该频道；省略则全量 */
+        @Query("channel") channel: String? = null,
+    ): PreferencesOkJson
 }

@@ -201,8 +201,8 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
     return count
 
 
-def _openalex_fetch_results(filter_str: str) -> list:
-    if not settings.openalex_enabled:
+def _openalex_fetch_results(filter_str: str, *, require_enabled: bool = True) -> list:
+    if require_enabled and not settings.openalex_enabled:
         return []
     mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "admin@cppteam.cn"
     params = {
@@ -227,8 +227,8 @@ def fetch_and_upsert_openalex(db: Session) -> int:
 
 
 def fetch_and_upsert_openalex_conference_works(db: Session) -> int:
-    """按「来源类型为会议 / proceedings」拉一批论文，填充「会议」频道（需开启 OpenAlex）。"""
-    if not settings.openalex_enabled or not settings.openalex_fetch_conference_works:
+    """按「来源类型为会议 / proceedings」拉一批论文，填充「会议」频道（公开 API，不依赖 openalex_enabled）。"""
+    if not settings.openalex_fetch_conference_works:
         return 0
     d = date.today() - timedelta(days=settings.openalex_lookback_days)
     base = [
@@ -246,7 +246,7 @@ def fetch_and_upsert_openalex_conference_works(db: Session) -> int:
     for tf in type_filters:
         filt = ",".join([*base, tf])
         try:
-            chunk = _openalex_fetch_results(filt)
+            chunk = _openalex_fetch_results(filt, require_enabled=False)
         except Exception:
             logger.warning("openalex conference batch failed filter=%s", tf, exc_info=True)
             continue
@@ -268,8 +268,8 @@ def fetch_and_upsert_openalex_conference_works(db: Session) -> int:
 
 
 def fetch_and_upsert_openalex_for_source_ids(db: Session, source_ids: list[str]) -> int:
-    """按用户订阅的 OpenAlex Source（会议/ proceedings）分别抓取。"""
-    if not settings.openalex_enabled or not source_ids:
+    """按用户订阅的 OpenAlex Source（会议/ proceedings）分别抓取（公开 API）。"""
+    if not source_ids:
         return 0
     seen: set[str] = set()
     total = 0
@@ -308,6 +308,55 @@ def fetch_and_upsert_openalex_for_source_ids(db: Session, source_ids: list[str])
         except Exception:
             logger.warning("openalex subscription source fetch failed id=%s", sid, exc_info=True)
     return total
+
+
+def fetch_and_upsert_openalex_works_search(
+    db: Session,
+    search_query: str,
+    *,
+    max_results: int = 35,
+) -> int:
+    """
+    用 OpenAlex 全文检索（标题/摘要）拉取近期 article，用于「期刊」频道按订阅关键词补库。
+    不依赖 openalex_enabled。
+    """
+    q = (search_query or "").strip()
+    if not q:
+        return 0
+    d = date.today() - timedelta(days=settings.openalex_lookback_days)
+    filt = ",".join(
+        [
+            "type:article",
+            f"from_publication_date:{d.isoformat()}",
+            "is_paratext:false",
+        ]
+    )
+    mailto = settings.openalex_mailto.replace("mailto:", "").strip() or "admin@cppteam.cn"
+    per = min(max(1, max_results), 200)
+    params = {
+        "filter": filt,
+        "search": q,
+        "per_page": per,
+        "sort": "publication_date:desc",
+        **_openalex_base_params(),
+    }
+    headers = {"User-Agent": f"LiteratureRadar/0.1 (mailto:{mailto})"}
+    try:
+        with httpx.Client(timeout=90.0, headers=headers) as client:
+            r = client.get(OPENALEX_WORKS, params=params)
+            r.raise_for_status()
+            data = r.json()
+    except Exception:
+        logger.warning("openalex search fetch failed q=%s", q[:80], exc_info=True)
+        return 0
+    results = data.get("results") or []
+    if not results:
+        return 0
+    try:
+        return _upsert_openalex_works_batch(db, results)
+    except Exception:
+        logger.warning("openalex search upsert failed", exc_info=True)
+        return 0
 
 
 def _arxiv_abs_url(external_id: str) -> str | None:

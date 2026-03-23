@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     openalex_fetch_conference_works: bool = True
     # 用户订阅里指定的 OpenAlex Source 每源抓取条数
     openalex_subscription_per_source: int = 35
+    # 「期刊」Feed：按订阅关键词 OpenAlex 检索补库（与 arxiv 关键词拉取类似）
+    openalex_journal_user_refresh_seconds: float = 600.0  # OPENALEX_JOURNAL_USER_REFRESH_SECONDS
+    openalex_journal_keyword_max_results: int = 40  # OPENALEX_JOURNAL_KEYWORD_MAX_RESULTS
+    openalex_journal_keyword_max_terms: int = 5  # 拼进 search 的最大词数；OPENALEX_JOURNAL_KEYWORD_MAX_TERMS
     # 全库抓取定时任务间隔（小时），与每日精选任务独立
     ingest_interval_hours: float = 1.0
     paper_ttl_days: int = 60

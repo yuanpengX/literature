@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const {
   heuristicBlurbFromAbstract,
+  heuristicBlurbFromTitle,
   isRedundantBlurb,
   stripHtmlToPlain,
 } = require('../../utils/textPlain.js')
@@ -19,7 +20,10 @@ function matchesChannel(paper, ch) {
 function normalizeFeedPaper(p) {
   if (!p || typeof p !== 'object') return p
   const fb0 = (p.feed_blurb || p.feedBlurb || '').trim()
-  let fb = fb0 || heuristicBlurbFromAbstract(p.abstract || '')
+  let fb =
+    fb0 ||
+    heuristicBlurbFromAbstract(p.abstract || '') ||
+    heuristicBlurbFromTitle(p.title || '')
   const abstPlain = stripHtmlToPlain(p.abstract || '')
   if (isRedundantBlurb(fb, abstPlain)) {
     fb = ''
@@ -44,6 +48,7 @@ Page({
     loading: true,
     loadingMore: false,
     error: '',
+    showBackTop: false,
   },
 
   onLoad() {
@@ -90,9 +95,21 @@ Page({
     if (showLoading) wx.stopPullDownRefresh()
   },
 
+  onPageScroll(e) {
+    const st = (e && e.scrollTop) || 0
+    const show = st > 480
+    if (show !== this.data.showBackTop) {
+      this.setData({ showBackTop: show })
+    }
+  },
+
+  onBackTop() {
+    wx.pageScrollTo({ scrollTop: 0, duration: 280 })
+  },
+
   async onPullDownRefresh() {
     try {
-      await api.requestSubscriptionFetch()
+      await api.requestSubscriptionFetch(this.data.channel)
     } catch (e) {}
     await this.loadFirst(true)
   },

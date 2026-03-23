@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -28,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -40,6 +43,7 @@ import com.literatureradar.app.data.toEntity
 import com.literatureradar.app.data.toPaperJson
 import com.literatureradar.app.ui.components.PaperCard
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -94,6 +98,14 @@ fun FeedScreen(
     var loadingMore by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    var showBackTop by remember { mutableStateOf(false) }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { idx -> showBackTop = idx > 3 }
+    }
 
     suspend fun applyImpressions(page: List<PaperJson>) {
         if (page.isEmpty()) return
@@ -152,6 +164,7 @@ fun FeedScreen(
     }
 
     LaunchedEffect(selectedChannel, selectedSort) {
+        listState.scrollToItem(0, 0)
         error = null
         nextCursor = null
         withContext(Dispatchers.IO) {
@@ -170,7 +183,7 @@ fun FeedScreen(
         if (tabReselectSignal <= 0) return@LaunchedEffect
         refreshing = true
         error = null
-        runCatching { ServiceLocator.api.requestSubscriptionFetch() }
+        runCatching { ServiceLocator.api.requestSubscriptionFetch(selectedChannel.apiValue) }
         runCatching { refreshFirstPage() }
             .onFailure { error = NetworkErrorHumanizer.message(it) }
         refreshing = false
@@ -213,27 +226,33 @@ fun FeedScreen(
                     }
                 }
             }
-            PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = {
-                    scope.launch {
-                        refreshing = true
-                        error = null
-                        runCatching { ServiceLocator.api.requestSubscriptionFetch() }
-                        runCatching { refreshFirstPage() }
-                            .onFailure { error = NetworkErrorHumanizer.message(it) }
-                        refreshing = false
-                    }
-                },
-                modifier = Modifier
+            Box(
+                Modifier
                     .weight(1f)
                     .fillMaxWidth(),
             ) {
-                LazyColumn(
+                PullToRefreshBox(
+                    isRefreshing = refreshing,
+                    onRefresh = {
+                        scope.launch {
+                            refreshing = true
+                            error = null
+                            runCatching {
+                                ServiceLocator.api.requestSubscriptionFetch(selectedChannel.apiValue)
+                            }
+                            runCatching { refreshFirstPage() }
+                                .onFailure { error = NetworkErrorHumanizer.message(it) }
+                            refreshing = false
+                        }
+                    },
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                 when {
                     loading && items.isEmpty() -> {
                         item(key = "loading") {
@@ -281,7 +300,7 @@ fun FeedScreen(
                                     )
                                     if (selectedChannel == FeedChannel.Conference) {
                                         Text(
-                                            "「会议」需服务端开启 OpenAlex，并拉取会议类型来源或您在订阅里填写的 Source ID。",
+                                            "「会议」由 OpenAlex 会议/ proceedings 来源拉取；也可在订阅里填写会议 Source ID。下拉仅刷新会议抓取。",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -336,6 +355,23 @@ fun FeedScreen(
                         }
                     }
                 }
+                    }
+                }
+                if (showBackTop) {
+                    FloatingActionButton(
+                        onClick = {
+                            scope.launch {
+                                listState.animateScrollToItem(0)
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(20.dp),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Text("↑", style = MaterialTheme.typography.titleLarge)
+                    }
                 }
             }
         }

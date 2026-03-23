@@ -68,6 +68,16 @@ def heuristic_feed_blurb_from_abstract(
     return out
 
 
+def heuristic_feed_blurb_from_title(title: str | None, *, max_len: int = 220) -> str:
+    """摘要不可用时的卡片介绍兜底（仅标题）。"""
+    plain = strip_html_to_plain(title)
+    if not plain:
+        return ""
+    if len(plain) <= max_len:
+        return plain
+    return plain[: max_len - 1].strip() + "…"
+
+
 def _is_metadata_only_plain(plain: str) -> bool:
     """已去 HTML 的纯文本：判断是否仅为期刊卷期/出版信息（非论文摘要）。"""
     if not plain or not plain.strip():

@@ -30,6 +30,7 @@ from app.services.openalex import (
     fetch_and_upsert_openalex,
     fetch_and_upsert_openalex_conference_works,
     fetch_and_upsert_openalex_for_source_ids,
+    fetch_and_upsert_openalex_works_search,
     normalize_openalex_source_id,
 )
 
@@ -188,6 +189,58 @@ def maybe_fetch_arxiv_for_user_keywords(db: Session, user_id: str, keywords: lis
         logger.info("arxiv keyword fetch user=%s new_rows=%s", user_id[:24], n)
     except Exception:
         logger.exception("arxiv keyword fetch failed user=%s", user_id[:24])
+
+
+def build_openalex_journal_search_query(keywords: list[str]) -> str | None:
+    """多条订阅关键词拼成 OpenAlex `search` 串（空格 AND）；词数上限见配置。"""
+    max_terms = min(max(int(settings.openalex_journal_keyword_max_terms), 1), 8)
+    parts: list[str] = []
+    for raw in keywords[:max_terms]:
+        s = (raw or "").strip()
+        if len(s) < 2:
+            continue
+        s = re.sub(r"[^\w\s\u4e00-\u9fff\-]", " ", s)
+        s = " ".join(s.split())
+        if s:
+            parts.append(s)
+    if not parts:
+        return None
+    return " ".join(parts)
+
+
+_openalex_journal_user_lock = threading.Lock()
+_openalex_journal_user_last_mono: dict[str, float] = {}
+
+
+def maybe_fetch_openalex_journal_for_user_keywords(db: Session, user_id: str, keywords: list[str]) -> None:
+    """期刊频道：按订阅关键词检索 OpenAlex 并入库（进程内节流）。"""
+    if not keywords or not user_id or user_id == "anonymous":
+        return
+    q = build_openalex_journal_search_query(keywords)
+    if not q:
+        return
+    interval = max(30.0, float(settings.openalex_journal_user_refresh_seconds))
+    now = time.monotonic()
+    with _openalex_journal_user_lock:
+        last = _openalex_journal_user_last_mono.get(user_id, 0.0)
+        if now - last < interval:
+            return
+    try:
+        n = fetch_and_upsert_openalex_works_search(
+            db,
+            q,
+            max_results=settings.openalex_journal_keyword_max_results,
+        )
+        with _openalex_journal_user_lock:
+            _openalex_journal_user_last_mono[user_id] = time.monotonic()
+        logger.info(
+            "openalex journal keyword fetch user=%s new_rows=%s q=%s",
+            user_id[:24],
+            n,
+            q[:80],
+        )
+    except Exception:
+        logger.exception("openalex journal keyword fetch failed user=%s", user_id[:24])
 
 
 def _parse_rss_date(entry) -> datetime | None:
@@ -405,6 +458,42 @@ def collect_subscription_openalex_source_ids(db: Session) -> list[str]:
                 seen.add(str(pid).strip())
                 out.append(str(pid).strip())
     return out
+
+
+def run_ingestion_channel_slice(db: Session, channel: str | None) -> dict[str, int]:
+    """按频道执行部分抓取（下拉刷新）；channel 无效或 None 时退化为全量。"""
+    ch = (channel or "").strip().lower()
+    out: dict[str, int] = {}
+    if ch == "arxiv":
+        out["arxiv_new"] = fetch_and_upsert_arxiv(db)
+        return out
+    if ch == "journal":
+        for raw in settings.rss_feeds.split(","):
+            u = raw.strip()
+            if u:
+                out[f"rss_g:{u[:28]}"] = fetch_and_upsert_rss(db, u)
+        for sub_url in collect_subscription_rss_urls(db):
+            out[f"rss_sub:{sub_url[:40]}"] = fetch_and_upsert_rss(db, sub_url)
+        if settings.openalex_enabled:
+            out["openalex_new"] = fetch_and_upsert_openalex(db)
+        return out
+    if ch == "conference":
+        out["openalex_conference_new"] = fetch_and_upsert_openalex_conference_works(db)
+        src_ids = collect_subscription_openalex_source_ids(db)
+        out["openalex_subscription_sources"] = fetch_and_upsert_openalex_for_source_ids(db, src_ids)
+        return out
+    return run_all_ingestion(db)
+
+
+def run_ingestion_standalone_for_channel(channel: str | None = None) -> None:
+    db = SessionLocal()
+    try:
+        out = run_ingestion_channel_slice(db, channel)
+        logger.info("ingestion channel=%s %s", channel, out)
+    except Exception:
+        logger.exception("ingestion channel=%s failed", channel)
+    finally:
+        db.close()
 
 
 def run_all_ingestion(db: Session) -> dict[str, int]:

@@ -36,6 +36,15 @@ function heuristicBlurbFromAbstract(abstractRaw, maxLen, maxSentences) {
   return out
 }
 
+/** 与服务端 heuristic_feed_blurb_from_title 对齐 */
+function heuristicBlurbFromTitle(titleRaw, maxLen) {
+  const maxL = maxLen == null ? 220 : maxLen
+  const plain = stripHtmlToPlain(titleRaw || '')
+  if (!plain) return ''
+  if (plain.length <= maxL) return plain
+  return plain.slice(0, maxL - 1).trim() + '\u2026'
+}
+
 function normalizedBlob(s) {
   return stripHtmlToPlain(s || '')
     .replace(/\s+/g, ' ')
@@ -60,5 +69,6 @@ function isRedundantBlurb(blurb, abstractPlain) {
 module.exports = {
   stripHtmlToPlain,
   heuristicBlurbFromAbstract,
+  heuristicBlurbFromTitle,
   isRedundantBlurb,
 }

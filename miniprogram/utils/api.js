@@ -315,8 +315,10 @@ function putMySubscriptions(body) {
   return request(paths.USERS_ME_SUBSCRIPTIONS, 'PUT', body)
 }
 
-function requestSubscriptionFetch() {
-  return request(paths.USERS_ME_SUBSCRIPTIONS_FETCH_NOW, 'GET')
+function requestSubscriptionFetch(channel) {
+  const ch = channel && String(channel).trim()
+  const q = ch ? { channel: ch } : undefined
+  return request(paths.USERS_ME_SUBSCRIPTIONS_FETCH_NOW, 'GET', q)
 }
 
 function postEvents(events) {

@@ -16,6 +16,7 @@ from app.models import Paper, PaperUserBlurb, UserProfile
 from app.services.text_plain import (
     feed_blurb_redundant_with_abstract,
     heuristic_feed_blurb_from_abstract,
+    heuristic_feed_blurb_from_title,
     strip_html_to_plain,
 )
 
@@ -51,7 +52,10 @@ def _call_llm_blurbs(
     for p in papers:
         abst = strip_html_to_plain(p.abstract).replace("\n", " ")[:650]
         lines.append(f"id={p.id} | {p.title}")
-        lines.append(f"摘要：{abst}")
+        if abst.strip():
+            lines.append(f"摘要：{abst}")
+        else:
+            lines.append("摘要：（暂无）请仅依据标题写客观简短介绍，勿编造技术细节。")
         lines.append("")
     lines.append('仅输出 JSON：{"items":[{"paper_id":1,"blurb":"..."},...]}')
     user_prompt = "\n".join(lines)
@@ -132,6 +136,8 @@ def merge_blurbs_into_feed_items(
         b = (m.get(it.id, "") or "").strip()
         if not b:
             b = heuristic_feed_blurb_from_abstract(it.abstract)
+        if not b:
+            b = heuristic_feed_blurb_from_title(it.title)
         if feed_blurb_redundant_with_abstract(b, it.abstract):
             b = ""
         items[i] = it.model_copy(update={"feed_blurb": b})

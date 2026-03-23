@@ -1,6 +1,28 @@
 .page {
   min-height: 100vh;
   padding-bottom: 24rpx;
+  position: relative;
+}
+
+.fab-top {
+  position: fixed;
+  right: 28rpx;
+  bottom: calc(160rpx + env(safe-area-inset-bottom));
+  z-index: 500;
+  width: 88rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 44rpx;
+  font-size: 40rpx;
+  font-weight: 600;
+  color: #fff;
+  background: #6750a4;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.18);
+}
+
+.fab-top-hover {
+  opacity: 0.88;
 }
 
 /* 页面滚动时频道/排序栏吸顶 */

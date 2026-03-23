@@ -15,7 +15,10 @@ from app.services.feed_blurbs import (
     load_blurbs_for_papers,
     merge_blurbs_into_feed_items,
 )
-from app.services.ingest import maybe_fetch_arxiv_for_user_keywords
+from app.services.ingest import (
+    maybe_fetch_arxiv_for_user_keywords,
+    maybe_fetch_openalex_journal_for_user_keywords,
+)
 from app.services.recommend import papers_to_feed_items
 from app.services.subscription_candidates import (
     filter_papers_by_user_subscriptions,
@@ -75,6 +78,11 @@ def get_feed(
         kws = user_subscription_keywords_list(user)
         if kws:
             maybe_fetch_arxiv_for_user_keywords(db, user_id, kws)
+
+    if ch == "journal" and user_id != "anonymous" and user is not None:
+        kws = user_subscription_keywords_list(user)
+        if kws:
+            maybe_fetch_openalex_journal_for_user_keywords(db, user_id, kws)
 
     merged = merge_subscription_candidate_papers(
         db,

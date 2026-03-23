@@ -1,4 +1,5 @@
 <view class="page">
+  <view wx:if="{{showBackTop}}" class="fab-top" bindtap="onBackTop" hover-class="fab-top-hover">↑</view>
   <view class="tab-bar-sticky">
   <view class="tabs">
     <view
