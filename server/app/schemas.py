@@ -36,6 +36,20 @@ class PaperOut(BaseModel):
         from_attributes = True
 
 
+class FeedDiagnostics(BaseModel):
+    """便于区分「库内无稿 / 订阅筛太狠 / 频道无稿 / LLM 失败」等。"""
+
+    merged_count: int = Field(default=0, description="合并候选池条数（多频道上限内）")
+    filtered_count: int = Field(default=0, description="订阅关键词/期刊/会议预筛后条数")
+    channel_count: int = Field(default=0, description="当前频道过滤后条数")
+    ordered_count: int = Field(default=0, description="排序后送 LLM 的候选数（已按相关性等排好序）")
+    collect_batches: int = Field(default=0, description="本次同步 collect 调用 LLM 的批次数")
+    collect_batches_no_blurb: int = Field(
+        default=0,
+        description="多批结束后该批仍无任何非空摘要的批次数（偏高多为 LLM/网络/密钥问题）",
+    )
+
+
 class FeedResponse(BaseModel):
     items: list[PaperOut]
     next_cursor: str | None = None
@@ -46,6 +60,22 @@ class FeedResponse(BaseModel):
     blurbs_generation_incomplete: bool = Field(
         default=False,
         description="同步墙钟内未凑满 limit，后台仍在补全摘要；客户端可提示下拉刷新",
+    )
+    feed_hint_code: str = Field(
+        default="ok",
+        description="客户端可据此分支文案：ok、no_llm_config、pool_empty、subscription_filtered_empty 等",
+    )
+    feed_hint_message: str = Field(
+        default="",
+        description="给用户看的空态/补充说明（中文）；有条目时可为空",
+    )
+    feed_pipeline_note: str = Field(
+        default="",
+        description="固定说明：处理顺序为先订阅预筛与排序，再按需调用用户 LLM 写摘要",
+    )
+    feed_diagnostics: FeedDiagnostics | None = Field(
+        default=None,
+        description="计数诊断；客户端可选展示或仅用于排查",
     )
 
 

@@ -102,6 +102,8 @@ fun FeedScreen(
     var blurbsLlmReady by remember { mutableStateOf(false) }
     /** 服务端同步时间预算内未凑满一页，后台续跑 LLM；提示下拉刷新 */
     var blurbsGenerationIncomplete by remember { mutableStateOf(false) }
+    var feedHintMessage by remember { mutableStateOf("") }
+    var feedPipelineNote by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     var showBackTop by remember { mutableStateOf(false) }
 
@@ -134,6 +136,8 @@ fun FeedScreen(
         )
         blurbsLlmReady = res.blurbsLlmReady
         blurbsGenerationIncomplete = res.blurbsGenerationIncomplete
+        feedHintMessage = res.feedHintMessage
+        feedPipelineNote = res.feedPipelineNote
         items = res.items.filter { it.matchesChannel(selectedChannel) }
         nextCursor = res.nextCursor
         if (res.items.isNotEmpty()) {
@@ -156,6 +160,12 @@ fun FeedScreen(
             )
             blurbsLlmReady = blurbsLlmReady || res.blurbsLlmReady
             blurbsGenerationIncomplete = blurbsGenerationIncomplete || res.blurbsGenerationIncomplete
+            if (res.feedHintMessage.isNotBlank()) {
+                feedHintMessage = res.feedHintMessage
+            }
+            if (res.feedPipelineNote.isNotBlank()) {
+                feedPipelineNote = res.feedPipelineNote
+            }
             if (res.items.isEmpty()) {
                 nextCursor = res.nextCursor
                 return
@@ -177,6 +187,8 @@ fun FeedScreen(
         nextCursor = null
         blurbsLlmReady = false
         blurbsGenerationIncomplete = false
+        feedHintMessage = ""
+        feedPipelineNote = ""
         withContext(Dispatchers.IO) {
             val cached = dao.listRecent(200).filter { it.matchesChannel(selectedChannel) }
             val withBlurbOnly = cached.map { it.toPaperJson() }.filter { it.feedBlurb.isNotBlank() }
@@ -310,23 +322,41 @@ fun FeedScreen(
                                             style = MaterialTheme.typography.titleMedium,
                                         )
                                         Text(
-                                            "推荐列表只展示已生成「中文摘要（2～3 句）」的论文。请在「设置」中填写模型接口地址、API Key 与模型 ID，保存以同步到服务器，然后下拉刷新本页。",
+                                            feedHintMessage.ifBlank {
+                                                "推荐列表只展示已生成「中文摘要（2～3 句）」的论文。请在「设置」中填写模型接口地址、API Key 与模型 ID，保存以同步到服务器，然后下拉刷新本页。"
+                                            },
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                        if (feedPipelineNote.isNotBlank()) {
+                                            Text(
+                                                feedPipelineNote,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     } else {
                                         Text(
-                                            "暂无条目",
+                                            "暂无推荐条目",
                                             style = MaterialTheme.typography.titleMedium,
                                         )
                                         Text(
-                                            "当前频道下还没有带中文摘要的论文，或摘要仍在生成中。请稍后下拉刷新；也可在「订阅配置」中调整关键词、期刊与会议，再下拉触发抓取。",
+                                            feedHintMessage.ifBlank {
+                                                "当前频道下还没有带中文摘要的论文，或摘要仍在生成中。请稍后下拉刷新；也可在「订阅配置」中调整关键词、期刊与会议，再下拉触发抓取。"
+                                            },
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                        if (selectedChannel == FeedChannel.Conference) {
+                                        if (feedPipelineNote.isNotBlank()) {
                                             Text(
-                                                "会议频道依赖 OpenAlex 会议 / proceedings 数据；可在订阅中添加会议 Source ID。",
+                                                feedPipelineNote,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        if (selectedChannel == FeedChannel.Conference && feedHintMessage.isBlank()) {
+                                            Text(
+                                                "会议频道依赖 OpenAlex 会议数据；可在订阅中添加会议 Source ID。",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -339,14 +369,22 @@ fun FeedScreen(
                     else -> {
                         if (blurbsGenerationIncomplete) {
                             item(key = "blurbs-incomplete-hint") {
-                                Text(
-                                    "摘要生成中，下拉刷新可加载更多",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 4.dp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
+                                Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                                    Text(
+                                        "摘要生成中，下拉刷新可加载更多",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    if (feedHintMessage.isNotBlank()) {
+                                        Text(
+                                            feedHintMessage,
+                                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
                         }
                         itemsIndexed(items, key = { _, p -> p.id }) { index, paper ->

@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import httpx
@@ -22,6 +23,14 @@ logger = logging.getLogger(__name__)
 BLURB_MAX = 680
 BATCH_MAX = 10
 _SYNC_BLURB_CAP = 32  # 单批 LLM 论文数硬上限，避免 prompt 过大
+
+
+@dataclass
+class FeedCollectStats:
+    """collect_feed_items_with_blurbs 过程统计，供 Feed 提示区分「过滤」与「LLM」问题。"""
+
+    batches_processed: int = 0
+    batches_zero_blurb_yield: int = 0  # 该批 ensure+merge 后主列表仍全无非空 feed_blurb
 
 
 def _normalize_llm_base(url: str) -> str:
@@ -241,12 +250,15 @@ def collect_feed_items_with_blurbs(
     abstract_enrich_enabled: bool,
     max_scan_multiplier: int,
     wall_deadline_monotonic: float | None = None,
-) -> tuple[list, int, bool]:
+) -> tuple[list, int, bool, FeedCollectStats]:
     """
     从 ordered 中自 offset 起顺序扫描，同步补全 LLM 摘要，直到凑满 limit 条均有非空 feed_blurb，
-    或超出扫描窗口/候选耗尽/墙钟超时。返回 (items, next_index, blurbs_generation_incomplete)。
+    或超出扫描窗口/候选耗尽/墙钟超时。
+    候选顺序由上游 papers_to_feed_items 决定（先订阅相关性筛选与排序，再在此做 LLM）。
+    返回 (items, next_index, blurbs_generation_incomplete, stats)。
     incomplete 仅在为凑满 limit 且因墙钟提前退出时为 True。
     """
+    stats = FeedCollectStats()
     out: list = []
     idx = max(0, int(offset))
     mult = max(1, int(max_scan_multiplier))
@@ -274,6 +286,9 @@ def collect_feed_items_with_blurbs(
             refresh_feed_items_abstracts(db, batch)
         ensure_blurbs_for_user_papers(db, user_id, ids, batch_size=len(ids))
         merge_blurbs_into_feed_items(db, user_id, batch)
+        stats.batches_processed += 1
+        if not any((it.feed_blurb or "").strip() for it in batch):
+            stats.batches_zero_blurb_yield += 1
         advance = 0
         filled_limit = False
         for it in batch:
@@ -289,7 +304,7 @@ def collect_feed_items_with_blurbs(
         idx += len(batch)
 
     incomplete = bool(hit_wall and len(out) < limit)
-    return out, idx, incomplete
+    return out, idx, incomplete, stats
 
 
 def merge_blurbs_into_feed_items(

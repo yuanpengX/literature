@@ -38,6 +38,8 @@ Page({
     showBackTop: false,
     blurbsLlmReady: false,
     blurbsGenerationIncomplete: false,
+    feedHintMessage: '',
+    feedPipelineNote: '',
   },
 
   onLoad() {
@@ -60,6 +62,8 @@ Page({
       error: '',
       blurbsLlmReady: false,
       blurbsGenerationIncomplete: false,
+      feedHintMessage: '',
+      feedPipelineNote: '',
     })
     this.loadFirst(true)
   },
@@ -74,8 +78,21 @@ Page({
       error: '',
       blurbsLlmReady: false,
       blurbsGenerationIncomplete: false,
+      feedHintMessage: '',
+      feedPipelineNote: '',
     })
     this.loadFirst(true)
+  },
+
+  feedHintBody(res) {
+    const m =
+      (res && (res.feed_hint_message || res.feedHintMessage || '')).trim() ||
+      ''
+    return m
+  },
+
+  feedPipeline(res) {
+    return ((res && (res.feed_pipeline_note || res.feedPipelineNote)) || '').trim() || ''
   },
 
   async loadFirst(showLoading) {
@@ -93,6 +110,8 @@ Page({
         nextCursor: res.next_cursor || null,
         blurbsLlmReady: llmReady,
         blurbsGenerationIncomplete: incomplete,
+        feedHintMessage: this.feedHintBody(res),
+        feedPipelineNote: this.feedPipeline(res),
         loading: false,
         error: '',
       })
@@ -144,6 +163,8 @@ Page({
         nextCursor: res.next_cursor || null,
         blurbsLlmReady: llmReady,
         blurbsGenerationIncomplete: incomplete,
+        feedHintMessage: this.feedHintBody(res) || this.data.feedHintMessage,
+        feedPipelineNote: this.feedPipeline(res) || this.data.feedPipelineNote,
         loadingMore: false,
       })
     } catch (err) {

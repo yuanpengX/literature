@@ -4,6 +4,16 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class FeedDiagnosticsJson(
+    @SerialName("merged_count") val mergedCount: Int = 0,
+    @SerialName("filtered_count") val filteredCount: Int = 0,
+    @SerialName("channel_count") val channelCount: Int = 0,
+    @SerialName("ordered_count") val orderedCount: Int = 0,
+    @SerialName("collect_batches") val collectBatches: Int = 0,
+    @SerialName("collect_batches_no_blurb") val collectBatchesNoBlurb: Int = 0,
+)
+
+@Serializable
 data class FeedResponseJson(
     val items: List<PaperJson> = emptyList(),
     @SerialName("next_cursor") val nextCursor: String? = null,
@@ -11,6 +21,12 @@ data class FeedResponseJson(
     @SerialName("blurbs_llm_ready") val blurbsLlmReady: Boolean = false,
     /** 同步窗口内未凑满 limit，后台仍在补全 blurb；宜下拉刷新 */
     @SerialName("blurbs_generation_incomplete") val blurbsGenerationIncomplete: Boolean = false,
+    @SerialName("feed_hint_code") val feedHintCode: String = "ok",
+    /** 空态/补充说明（服务端中文） */
+    @SerialName("feed_hint_message") val feedHintMessage: String = "",
+    /** 固定说明：先筛选排序再 LLM */
+    @SerialName("feed_pipeline_note") val feedPipelineNote: String = "",
+    @SerialName("feed_diagnostics") val feedDiagnostics: FeedDiagnosticsJson? = null,
 )
 
 @Serializable

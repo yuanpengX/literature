@@ -15,6 +15,13 @@ from app.services.feed_blurbs import (
     collect_feed_items_with_blurbs,
     feed_blurbs_continue_after_index,
 )
+from app.services.feed_hint import (
+    FEED_PIPELINE_NOTE_ZH,
+    build_feed_diagnostics,
+    hint_after_collect,
+    hint_for_no_llm,
+    hint_for_zero_ordered,
+)
 from app.services.ingest import (
     maybe_fetch_arxiv_for_user_keywords,
     maybe_fetch_openalex_journal_for_user_keywords,
@@ -60,6 +67,16 @@ def _bg_maybe_fetch_openalex_journal(user_id: str, keywords: list[str]) -> None:
 FeedSort = Literal["recommended", "recent", "hot", "for_you"]
 
 
+def _channel_label(ch: str | None) -> str:
+    if ch == "arxiv":
+        return "arXiv"
+    if ch == "journal":
+        return "期刊"
+    if ch == "conference":
+        return "会议"
+    return "全部"
+
+
 @router.get("", response_model=FeedResponse)
 def get_feed(
     background_tasks: BackgroundTasks,
@@ -73,6 +90,7 @@ def get_feed(
         description="arxiv | journal | conference；不传则不分频道（全部）",
     ),
 ):
+    # 流水线（与 feed_pipeline_note 一致）：merge → 订阅预筛 → 频道 → papers_to_feed_items 排序 → collect LLM
     offset = 0
     if cursor:
         try:
@@ -166,7 +184,16 @@ def get_feed(
         and (user.llm_model or "").strip()
     )
 
+    diag_base = build_feed_diagnostics(
+        len(merged),
+        len(filtered),
+        len(papers),
+        len(ordered),
+        None,
+    )
+
     if not blurbs_llm_ready:
+        hint_code, hint_msg = hint_for_no_llm(user_id, user)
         logger.info(
             "feed response empty reason=no_llm user=%s channel=%s anonymous=%s "
             "profile=%s has_base_url=%s has_api_key=%s has_model=%s strict_sub=%s",
@@ -184,11 +211,42 @@ def get_feed(
             next_cursor=None,
             blurbs_llm_ready=False,
             blurbs_generation_incomplete=False,
+            feed_hint_code=hint_code,
+            feed_hint_message=hint_msg,
+            feed_pipeline_note=FEED_PIPELINE_NOTE_ZH,
+            feed_diagnostics=diag_base,
+        )
+
+    if len(ordered) == 0:
+        hint_code, hint_msg = hint_for_zero_ordered(
+            len(merged),
+            len(filtered),
+            len(papers),
+            _channel_label(ch),
+            settings.feed_strict_subscription_filter,
+        )
+        logger.info(
+            "feed response empty reason=zero_ordered user=%s hint=%s merged=%s filtered=%s papers=%s",
+            _log_user_prefix(user_id),
+            hint_code,
+            len(merged),
+            len(filtered),
+            len(papers),
+        )
+        return FeedResponse(
+            items=[],
+            next_cursor=None,
+            blurbs_llm_ready=True,
+            blurbs_generation_incomplete=False,
+            feed_hint_code=hint_code,
+            feed_hint_message=hint_msg,
+            feed_pipeline_note=FEED_PIPELINE_NOTE_ZH,
+            feed_diagnostics=diag_base,
         )
 
     t0 = time.monotonic()
     wall_deadline = t0 + max(5.0, float(settings.feed_sync_wall_seconds))
-    page, next_idx, blurbs_generation_incomplete = collect_feed_items_with_blurbs(
+    page, next_idx, blurbs_generation_incomplete, coll_stats = collect_feed_items_with_blurbs(
         db,
         user_id,
         ordered,
@@ -248,9 +306,35 @@ def get_feed(
                 len(ordered_ids),
             )
 
+    hint_code, hint_msg = hint_after_collect(
+        len(ordered),
+        len(page),
+        blurbs_generation_incomplete,
+        coll_stats,
+    )
+    logger.info(
+        "feed response hint user=%s code=%s page_items=%s batches=%s batches_no_blurb=%s",
+        _log_user_prefix(user_id),
+        hint_code,
+        len(page),
+        coll_stats.batches_processed,
+        coll_stats.batches_zero_blurb_yield,
+    )
+    diag_full = build_feed_diagnostics(
+        len(merged),
+        len(filtered),
+        len(papers),
+        len(ordered),
+        coll_stats,
+    )
+
     return FeedResponse(
         items=page,
         next_cursor=next_cursor,
         blurbs_llm_ready=True,
         blurbs_generation_incomplete=blurbs_generation_incomplete,
+        feed_hint_code=hint_code,
+        feed_hint_message=hint_msg,
+        feed_pipeline_note=FEED_PIPELINE_NOTE_ZH,
+        feed_diagnostics=diag_full,
     )

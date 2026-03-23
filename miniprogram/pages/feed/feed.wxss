@@ -70,6 +70,14 @@
   padding: 0 8rpx;
 }
 
+.feed-incomplete-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #49454f;
+}
+
 .list-wrap {
   padding: 24rpx;
 }
