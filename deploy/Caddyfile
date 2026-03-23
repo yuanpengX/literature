@@ -1,5 +1,9 @@
 # 文献雷达 API — HTTPS 终止于 Caddy，反代到 literature-api:8000
-# 变量 LITERATURE_DOMAIN 来自 deploy/https.env（见 README）
+# LITERATURE_DOMAIN、ACME_EMAIL 来自 deploy/https.env（见 README）
+
+{
+	email {$ACME_EMAIL}
+}
 
 {$LITERATURE_DOMAIN} {
 	encode gzip zstd

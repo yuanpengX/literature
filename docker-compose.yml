@@ -1,6 +1,8 @@
 # 文献雷达 API — Docker 部署（默认 SQLite 持久化到卷）
 # 使用：在项目根目录执行  docker compose up -d --build
 #
+# 生产对外仅 HTTPS、且不暴露宿主机 8000：见 docker-compose.https-stack.yml
+#
 # 腾讯云 CVM：宿主机建议配置 Docker 镜像加速（拉 python 等基础镜像更快）
 #   /etc/docker/daemon.json → "registry-mirrors": ["https://mirror.ccs.tencentyun.com"]
 #
@@ -35,9 +37,8 @@ services:
       - literature_data:/data
     restart: unless-stopped
 
-  # HTTPS：自动 Let’s Encrypt，供小程序真机 request 合法域名
-  # 用法：cp deploy/https.env.example deploy/https.env 并填写域名与邮箱 →
-  #       docker compose --profile https up -d --build
+  # HTTPS（兼容 profile）：需 deploy/https.env 含 LITERATURE_DOMAIN、ACME_EMAIL
+  # 生产推荐：docker-compose.https-stack.yml（API 不映射 8000）
   caddy:
     image: caddy:2-alpine
     profiles:

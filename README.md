@@ -23,6 +23,36 @@ Monorepo：**Android 客户端** + **FastAPI 后端**。当前已实现：arXiv 
 
 ## 服务端 Docker 部署
 
+### 生产：对外仅 HTTPS（推荐）
+
+真机小程序、正式版客户端要求 **HTTPS** 与**已备案**（如适用）的合法域名。请使用专用编排 **[`docker-compose.https-stack.yml`](docker-compose.https-stack.yml)**：API 容器**不**映射宿主机 `8000`，仅由 **Caddy** 在 **80/443** 终止 TLS 并反代到 `literature-api:8000`。
+
+**前置条件**
+
+1. 域名已解析到服务器公网 IP（如 `api.example.com`）。
+2. 安全组放行 **TCP 80、443**。
+3. 服务器能访问 Let’s Encrypt（不可用时见文末「自定义证书」说明）。
+
+**步骤**
+
+```bash
+cp deploy/https.env.example deploy/https.env
+# 编辑 deploy/https.env：
+#   LITERATURE_DOMAIN=api.你的域名.com（无 https://、无端口）
+#   ACME_EMAIL=你的邮箱（Let’s Encrypt 账户）
+cp server/.env.example server/.env   # 按需填写密钥等
+docker compose -f docker-compose.https-stack.yml up -d --build
+```
+
+- 对外根地址：`https://<LITERATURE_DOMAIN>`（例如 `https://api.example.com/health`）
+- 客户端：将 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 的 `DEFAULT_BASE_URL` 与 [`android/.../strings.xml`](android/app/src/main/res/values/strings.xml) 的 `api_base_url` 设为同一 **https 根地址**（无尾斜杠、无 `/api/v1`）
+- 微信公众平台 → **服务器域名** → request 合法域名填你的 **https 域名**（不要带路径）
+- 从旧部署升级时：若仅有 `LITERATURE_DOMAIN`，请在 `https.env` 中**补充** `ACME_EMAIL`
+
+**说明**：[`deploy/Caddyfile`](deploy/Caddyfile) 使用全局 `email` 与站点反代；API 镜像内 **uvicorn** 已加 `--proxy-headers`，以便正确识别 `X-Forwarded-Proto` 等。若 Let’s Encrypt 不可用，可自行改写 `deploy/Caddyfile` 使用 `tls` 挂载云厂商证书（见 Caddy 文档）。
+
+### 本地 / 内网：直连 API 端口
+
 在项目根目录：
 
 ```bash
@@ -31,34 +61,13 @@ docker compose up -d --build
 
 - 接口地址：`http://<主机IP>:8000`
 - 健康检查：`GET /health`
-- 数据：`SQLite` 文件在卷 **`literature_data`** 内路径 `/data/literature.db`（勿删卷以免丢库）
-- 可选环境变量：复制 [`server/.env.example`](server/.env.example) 为 `server/.env`（密钥勿提交）；Compose 已通过 `env_file` 加载该文件
+- 数据：`SQLite` 在卷 **`literature_data`** → `/data/literature.db`
 
-### HTTPS（小程序真机 / 合法域名）
+可选环境变量：复制 [`server/.env.example`](server/.env.example) 为 `server/.env`。
 
-真机与正式版要求 **HTTPS** 且域名在公众平台配置为 **request 合法域名**。推荐用 **Caddy** 自动申请并续期 **Let’s Encrypt** 证书（`--profile https`）。
+### 兼容：根目录 Compose + `--profile https`
 
-**前置条件**
-
-1. 已有一个**解析到服务器公网 IP** 的域名（仅子域即可，如 `api.example.com`）。
-2. 云安全组 / 防火墙放行 **TCP 80、443**（证书校验需访问 80；业务走 443）。
-3. 服务器能访问 Let’s Encrypt（部分网络环境若失败，需换用其它证书源或境外线路，见文末说明）。
-
-**步骤**
-
-```bash
-cp deploy/https.env.example deploy/https.env
-# 编辑 deploy/https.env：填写 LITERATURE_DOMAIN=api.你的域名.com（无 https://、无端口）
-docker compose --profile https up -d --build
-```
-
-- 对外地址：`https://<LITERATURE_DOMAIN>`（路径仍为 `/api/v1/...`，如 `https://api.example.com/health`）
-- 小程序：把 [`miniprogram/utils/api.js`](miniprogram/utils/api.js) 中 `DEFAULT_BASE_URL` 改为上述 **https 根地址**，或在设置里写入 `api_base_url`
-- 微信公众平台 → 开发设置 → **服务器域名** → request 合法域名填：`https://api.你的域名.com`（与微信后台要求一致，**不要**带尾路径）
-- 内地小程序域名通常需**备案**；请按微信与管局要求自行完成
-- 生产环境可在安全组**关闭 8000 对外**，仅保留 80/443，由 Caddy 反代到容器内 `literature-api:8000`
-
-**说明**：若 Let’s Encrypt 在你所在网络不可用，可改用云厂商免费证书（如腾讯云 SSL）手动得到 `fullchain.pem` / `privkey.pem` 后，自行改写 `deploy/Caddyfile` 使用 `tls /path/to/cert.pem /path/to/key.pem` 并挂载证书目录（需自行查阅 Caddy 文档）。
+仍可使用 [`docker-compose.yml`](docker-compose.yml) 的 **`caddy` 服务（`--profile https`）**，此时 API 的 **8000** 仍会映射到宿主机；适合过渡期。生产上更推荐 **`docker-compose.https-stack.yml`** 以避免对外暴露 8000。
 
 停止并删除容器（保留数据卷）：
 
@@ -103,8 +112,8 @@ cp .env.example .env
 
 用 **Android Studio** 打开 `android` 目录同步工程。
 
-- **模拟器**访问本机 Docker/本地后端：`res/values/strings.xml` 中 `api_base_url` 使用 `http://10.0.2.2:8000`。
-- **真机**：改为电脑或服务器的 **局域网 / 公网 IP**（与手机同一网络或可路由），并放行防火墙 **8000** 端口。
+- **模拟器**连本机 `docker compose`（仅映射 8000）：`api_base_url` 可用 `http://10.0.2.2:8000`。
+- **真机 / 正式版**：与小程序一致，使用 **HTTPS API 根地址**（部署见上文 `docker-compose.https-stack.yml`）；纯内网调试时再改用 `http://<局域网IP>:8000` 并放行 **8000**。
 
 ---
 

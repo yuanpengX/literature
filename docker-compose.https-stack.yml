@@ -1,0 +1,50 @@
+# 对外仅通过 HTTPS 暴露 API（Caddy 终止 TLS，API 不映射宿主机 8000）
+#
+# 前置：域名解析到本机公网 IP；安全组放行 TCP 80、443
+# 1. cp deploy/https.env.example deploy/https.env
+# 2. 编辑 deploy/https.env：填写 LITERATURE_DOMAIN、ACME_EMAIL
+# 3. 复制 server/.env.example → server/.env 并配置密钥等
+# 4. 在项目根目录：docker compose -f docker-compose.https-stack.yml up -d --build
+#
+# 验证：curl https://你的域名/health
+# 小程序 / Android：API 根地址为 https://你的域名（无尾斜杠、无 /api/v1）
+#
+# 本地开发仍可用根目录 docker-compose.yml（直连 :8000）
+
+services:
+  literature-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    env_file:
+      - server/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "8000"
+    environment:
+      DATABASE_URL: "sqlite:////data/literature.db"
+      TZ: Asia/Shanghai
+    volumes:
+      - literature_data:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - deploy/https.env
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - literature-api
+    restart: unless-stopped
+
+volumes:
+  literature_data:
+  caddy_data:
+  caddy_config:
