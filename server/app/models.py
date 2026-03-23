@@ -17,6 +17,8 @@ class Paper(Base):
     pdf_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     html_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source: Mapped[str] = mapped_column(String(64), index=True)  # arxiv, rss:host
+    # OpenAlex Work 的 primary_location.source.id 规范为短码 S…，用于按用户订阅的会议 Source 精确匹配
+    openalex_source_key: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     primary_category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ingested_at: Mapped[datetime] = mapped_column(

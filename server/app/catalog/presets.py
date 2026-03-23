@@ -89,6 +89,36 @@ JOURNAL_PRESETS: dict[str, JournalPreset] = {
     ),
 }
 
+# 订阅预筛：OpenAlex venue 展示名常与预设简称不一致（如 NeurIPS → Advances in Neural…），补充可匹配子串
+CONFERENCE_EXTRA_NEEDLES_BY_PRESET_ID: dict[str, tuple[str, ...]] = {
+    "neurips": (
+        "neural information processing",
+        "advances in neural",
+    ),
+    "icml": (
+        "international conference on machine learning",
+        "machine learning research",
+        "proc. mach. learn",
+    ),
+    "iclr": ("international conference on learning representations",),
+    "ismb": ("intelligent systems for molecular biology",),
+    "recomb": ("research in computational molecular biology",),
+    "cvpr": ("computer vision and pattern recognition", " ieee/cvf"),
+    "eccv": ("european conference on computer vision",),
+    "acl": (
+        "association for computational linguistics",
+        "meeting of the association for computational linguistics",
+    ),
+    "emnlp": ("empirical methods in natural language processing",),
+    "naacl": ("north american chapter of the acl", "north american chapter of the association"),
+    "aaai": ("aaai conference on artificial intelligence",),
+    "ijcai": ("international joint conference on artificial intelligence",),
+    "kdd": ("knowledge discovery and data mining", "sigkdd"),
+    "www": ("the web conference", "international world wide web", "www conference"),
+    "sigir": ("research and development in information retrieval", "sigir"),
+}
+
+
 CONFERENCE_PRESETS: dict[str, ConferencePreset] = {
     "neurips": ConferencePreset(
         id="neurips",

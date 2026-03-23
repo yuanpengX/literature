@@ -158,6 +158,7 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
         src = pl.get("source") or {}
         venue = (src.get("display_name") or pl.get("raw_source_name") or "") or None
         primary = (venue[:128] if venue else None)
+        oa_src_key = normalize_openalex_source_id(str(src.get("id") or "").strip() or None)
         src_type = str(src.get("type") or "").lower().replace(" ", "")
         if src_type == "journal":
             paper_source = "openalex:journal"
@@ -178,6 +179,7 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
             existing.html_url = html_url
             existing.primary_category = primary
             existing.source = paper_source
+            existing.openalex_source_key = oa_src_key
             existing.citation_count = cited
             if published:
                 existing.published_at = published
@@ -192,6 +194,7 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
                     html_url=html_url,
                     source=paper_source,
                     primary_category=primary,
+                    openalex_source_key=oa_src_key,
                     published_at=published,
                     citation_count=cited,
                 )
@@ -227,7 +230,7 @@ def fetch_and_upsert_openalex(db: Session) -> int:
 
 
 def fetch_and_upsert_openalex_conference_works(db: Session) -> int:
-    """按「来源类型为会议 / proceedings」拉一批论文，填充「会议」频道（公开 API，不依赖 openalex_enabled）。"""
+    """按「来源类型为会议」拉一批论文，填充「会议」频道（公开 API，不依赖 openalex_enabled）。"""
     if not settings.openalex_fetch_conference_works:
         return 0
     d = date.today() - timedelta(days=settings.openalex_lookback_days)
@@ -236,28 +239,13 @@ def fetch_and_upsert_openalex_conference_works(db: Session) -> int:
         f"from_publication_date:{d.isoformat()}",
         "is_paratext:false",
     ]
-    # OpenAlex 中部分 proceedings 的 source.type 为 proceedings 而非 conference，分两路拉取并去重
-    type_filters = (
-        "primary_location.source.type:conference",
-        "primary_location.source.type:proceedings",
-    )
-    seen_wid: set[str] = set()
-    merged: list = []
-    for tf in type_filters:
-        filt = ",".join([*base, tf])
-        try:
-            chunk = _openalex_fetch_results(filt, require_enabled=False)
-        except Exception:
-            logger.warning("openalex conference batch failed filter=%s", tf, exc_info=True)
-            continue
-        for w in chunk:
-            if not isinstance(w, dict):
-                continue
-            wid = _openalex_short_id(str(w.get("id") or ""))
-            if not wid or wid in seen_wid:
-                continue
-            seen_wid.add(wid)
-            merged.append(w)
+    # 注：OpenAlex 当前 Works 过滤器 primary_location.source.type:proceedings 恒为 0 条，勿再发无效请求
+    filt = ",".join([*base, "primary_location.source.type:conference"])
+    try:
+        merged = _openalex_fetch_results(filt, require_enabled=False)
+    except Exception:
+        logger.warning("openalex conference batch failed", exc_info=True)
+        return 0
     if not merged:
         return 0
     try:

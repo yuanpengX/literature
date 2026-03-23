@@ -7,7 +7,13 @@ from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
-from app.catalog.presets import CONFERENCE_PRESETS, JOURNAL_PRESETS, user_subscription_keywords_list
+from app.catalog.presets import (
+    CONFERENCE_EXTRA_NEEDLES_BY_PRESET_ID,
+    CONFERENCE_PRESETS,
+    JOURNAL_PRESETS,
+    user_subscription_keywords_list,
+)
+from app.services.openalex import normalize_openalex_source_id
 from app.models import Paper, UserProfile
 from app.services.recommend import load_candidate_papers
 from app.services.text_plain import strip_html_to_plain
@@ -77,7 +83,7 @@ def _enabled_journal_netlocs(subscription_journals_json: str) -> set[str]:
 
 
 def _conference_match_needles(subscription_conferences_json: str) -> list[str]:
-    """用于与 Paper.primary_category（venue 名）子串匹配。"""
+    """用于会议论文与 venue / 标题 / 摘要的子串匹配（见 _conference_hit）。"""
     needles: list[str] = []
     try:
         arr = json.loads(subscription_conferences_json or "[]")
@@ -96,6 +102,10 @@ def _conference_match_needles(subscription_conferences_json: str) -> list[str]:
                     t = (part or "").strip()
                     if len(t) >= 2:
                         needles.append(t.lower())
+                for extra in CONFERENCE_EXTRA_NEEDLES_BY_PRESET_ID.get(cid, ()):
+                    et = (extra or "").strip().lower()
+                    if len(et) >= 4:
+                        needles.append(et)
         name = (item.get("name") or "").strip()
         if name and len(name) >= 2:
             needles.append(name.lower())
@@ -109,12 +119,40 @@ def _conference_match_needles(subscription_conferences_json: str) -> list[str]:
     return uniq
 
 
+def _enabled_conference_openalex_source_keys(subscription_conferences_json: str) -> set[str]:
+    """用户启用的会议 OpenAlex Source 短码（大写 S…），与 Paper.openalex_source_key 对齐。"""
+    out: set[str] = set()
+    try:
+        arr = json.loads(subscription_conferences_json or "[]")
+    except json.JSONDecodeError:
+        return out
+    if not isinstance(arr, list):
+        return out
+    for item in arr:
+        if not isinstance(item, dict) or not item.get("enabled", True):
+            continue
+        raw_oid = (item.get("openalex_source_id") or "").strip()
+        oid = normalize_openalex_source_id(raw_oid)
+        if oid:
+            out.add(oid.upper())
+            continue
+        cid = (item.get("id") or "").strip()
+        preset = CONFERENCE_PRESETS.get(cid) if cid else None
+        if preset and preset.openalex_source_id:
+            oid2 = normalize_openalex_source_id(str(preset.openalex_source_id).strip())
+            if oid2:
+                out.add(oid2.upper())
+    return out
+
+
 def user_has_enabled_subscription(user: UserProfile) -> bool:
     if user_subscription_keywords_list(user):
         return True
     if _enabled_journal_netlocs(user.subscription_journals_json or "[]"):
         return True
     if _conference_match_needles(user.subscription_conferences_json or "[]"):
+        return True
+    if _enabled_conference_openalex_source_keys(user.subscription_conferences_json or "[]"):
         return True
     return False
 
@@ -143,9 +181,30 @@ def _conference_hit(p: Paper, needles: list[str]) -> bool:
     if not src.startswith("openalex:conference"):
         return False
     cat = (p.primary_category or "").lower()
-    if not cat:
+    title = (p.title or "").lower()
+    abst = strip_html_to_plain(p.abstract or "").lower()
+    # 短针只在 venue+标题上匹配，降低在摘要中的误触（如 "kdd"）
+    for n in needles:
+        if not n:
+            continue
+        if len(n) < 5:
+            hay = f"{cat} {title}"
+            if n in hay:
+                return True
+        else:
+            if n in cat or n in title or n in abst:
+                return True
+    return False
+
+
+def _conference_source_key_hit(p: Paper, keys: set[str]) -> bool:
+    if not keys:
         return False
-    return any(n in cat for n in needles if n)
+    src = (p.source or "").lower()
+    if not src.startswith("openalex:conference"):
+        return False
+    k = (getattr(p, "openalex_source_key", None) or "").strip().upper()
+    return bool(k and k in keys)
 
 
 def filter_papers_by_user_subscriptions(
@@ -167,9 +226,15 @@ def filter_papers_by_user_subscriptions(
     kws = user_subscription_keywords_list(u)
     netlocs = _enabled_journal_netlocs(u.subscription_journals_json or "[]")
     conf_needles = _conference_match_needles(u.subscription_conferences_json or "[]")
+    conf_src_keys = _enabled_conference_openalex_source_keys(u.subscription_conferences_json or "[]")
 
     out: list[Paper] = []
     for p in papers:
-        if _keyword_hit(p, kws) or _journal_hit(p, netlocs) or _conference_hit(p, conf_needles):
+        if (
+            _keyword_hit(p, kws)
+            or _journal_hit(p, netlocs)
+            or _conference_hit(p, conf_needles)
+            or _conference_source_key_hit(p, conf_src_keys)
+        ):
             out.append(p)
     return out

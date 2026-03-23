@@ -81,6 +81,8 @@ def ensure_papers_schema(engine) -> None:
                 conn.execute(text("ALTER TABLE papers ADD COLUMN citation_synced_at TIMESTAMPTZ"))
         if "authors_text" not in cols:
             conn.execute(text("ALTER TABLE papers ADD COLUMN authors_text TEXT DEFAULT ''"))
+        if "openalex_source_key" not in cols:
+            conn.execute(text("ALTER TABLE papers ADD COLUMN openalex_source_key VARCHAR(32)"))
 
 
 def get_db() -> Generator[Session, None, None]:
