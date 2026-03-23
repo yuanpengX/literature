@@ -1,10 +1,12 @@
+import logging
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.catalog.presets import user_subscription_keywords_list
 from app.config import settings
+from app.database import SessionLocal
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
 from app.schemas import FeedResponse
@@ -21,13 +23,36 @@ from app.services.subscription_candidates import (
 )
 from app.services.user_defaults import default_subscription_fields
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/feed", tags=["feed"])
+
+
+def _bg_maybe_fetch_arxiv(user_id: str, keywords: list[str]) -> None:
+    db = SessionLocal()
+    try:
+        maybe_fetch_arxiv_for_user_keywords(db, user_id, keywords)
+    except Exception:
+        logger.exception("background arxiv keyword fetch failed user=%s", user_id[:24])
+    finally:
+        db.close()
+
+
+def _bg_maybe_fetch_openalex_journal(user_id: str, keywords: list[str]) -> None:
+    db = SessionLocal()
+    try:
+        maybe_fetch_openalex_journal_for_user_keywords(db, user_id, keywords)
+    except Exception:
+        logger.exception("background openalex journal fetch failed user=%s", user_id[:24])
+    finally:
+        db.close()
 
 FeedSort = Literal["recommended", "recent", "hot", "for_you"]
 
 
 @router.get("", response_model=FeedResponse)
 def get_feed(
+    background_tasks: BackgroundTasks,
     user_id: Annotated[str, Depends(current_user_id)],
     db: Session = Depends(get_db),
     cursor: str | None = Query(None, description="Offset string for pagination"),
@@ -70,12 +95,13 @@ def get_feed(
     if ch == "arxiv" and user_id != "anonymous" and user is not None:
         kws = user_subscription_keywords_list(user)
         if kws:
-            maybe_fetch_arxiv_for_user_keywords(db, user_id, kws)
+            # 外网抓取耗时不定，勿阻塞首字节，避免客户端误判为连接失败；下刷即可看到新数据
+            background_tasks.add_task(_bg_maybe_fetch_arxiv, user_id, list(kws))
 
     if ch == "journal" and user_id != "anonymous" and user is not None:
         kws = user_subscription_keywords_list(user)
         if kws:
-            maybe_fetch_openalex_journal_for_user_keywords(db, user_id, kws)
+            background_tasks.add_task(_bg_maybe_fetch_openalex_journal, user_id, list(kws))
 
     merged = merge_subscription_candidate_papers(
         db,

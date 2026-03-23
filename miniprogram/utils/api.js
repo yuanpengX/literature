@@ -8,6 +8,44 @@ const DEFAULT_BASE_URL = 'https://cppteam.cn'
 const TOKEN_KEY = 'mp_access_token'
 const STORAGE_USE_SERVER_IP = 'api_use_server_ip'
 const STORAGE_IP_BASE_CACHED = 'api_http_ip_base_cached'
+/** 文献 API：Feed 可能含多轮服务端 LLM，默认 60s 易误判为失败 */
+const WX_REQUEST_TIMEOUT_MS = 120000
+
+function isLikelyTransportLayerFailure(errMsg, errno) {
+  const s = String(errMsg || '')
+  if (errno === 600001 || errno === -118) return true
+  if (
+    /ERR_CONNECTION|CONNECTION_RESET|CONNECTION_REFUSED|ENOTFOUND|Failed to connect|无法连接|网络连接失败|net::ERR_/i.test(
+      s,
+    )
+  ) {
+    return true
+  }
+  if (/timeout|超时|TIMED_OUT/i.test(s) && /net::|ERR_CONNECTION|ERR_TIMED_OUT/i.test(s)) return true
+  return false
+}
+
+/**
+ * @param {object} opts
+ * @param {string} opts.url
+ * @param {string} [opts.method]
+ * @param {object} [opts.header]
+ * @param {*} [opts.data]
+ * @param {number} [opts.timeout]
+ */
+function wxLiteratureRequest(opts) {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: opts.url,
+      method: opts.method || 'GET',
+      data: opts.data,
+      header: opts.header || {},
+      timeout: opts.timeout != null ? opts.timeout : WX_REQUEST_TIMEOUT_MS,
+      success: resolve,
+      fail: reject,
+    })
+  })
+}
 
 function getToken() {
   return wx.getStorageSync(TOKEN_KEY) || ''
@@ -39,33 +77,43 @@ function wxLoginCode() {
 
 /** 不带鉴权头，仅用于登录 */
 function postWechatLogin(code) {
-  const base = getBaseUrl()
-  if (!base) {
-    return Promise.reject(new Error('文献 API 根地址无效'))
-  }
-  const url = joinLiteratureApiUrl(base, paths.AUTH_WECHAT_LOGIN)
-  return new Promise((resolve, reject) => {
-    wx.request({
+  function loginWithBase(base) {
+    if (!base) {
+      return Promise.reject(new Error('文献 API 根地址无效'))
+    }
+    const url = joinLiteratureApiUrl(base, paths.AUTH_WECHAT_LOGIN)
+    return wxLiteratureRequest({
       url,
       method: 'POST',
       header: { 'Content-Type': 'application/json' },
       data: { code },
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data)
-        } else {
-          const d = res.data
-          const msg =
-            (d && (d.detail || d.message)) ||
-            res.errMsg ||
-            'HTTP ' + res.statusCode
-          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
-        }
-      },
-      fail(err) {
-        reject(new Error((err && err.errMsg) || '网络错误'))
-      },
+    }).then((res) => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return res.data
+      }
+      const d = res.data
+      const msg =
+        (d && (d.detail || d.message)) || res.errMsg || 'HTTP ' + res.statusCode
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
     })
+  }
+  const primary = getBaseUrl()
+  return loginWithBase(primary).catch((err) => {
+    const isWx = !!(err && typeof err === 'object' && err.errMsg)
+    if (
+      !isWx ||
+      !getUseServerIp() ||
+      !isLikelyTransportLayerFailure(err.errMsg, err.errno)
+    ) {
+      return Promise.reject(err)
+    }
+    const ipB = canonicalizeLiteratureApiBase(getCachedServerIpBase())
+    const dom = getDomainBaseUrl()
+    if (!ipB || !dom || primary !== ipB || dom === ipB) {
+      return Promise.reject(err)
+    }
+    setUseServerIp(false)
+    return loginWithBase(dom)
   })
 }
 
@@ -213,32 +261,23 @@ function fetchServerHttpIpBase(domainRoot) {
     return Promise.reject(new Error('域名根地址无效'))
   }
   const url = joinLiteratureApiUrl(base, paths.CONFIG_CLIENT)
-  return new Promise((resolve, reject) => {
-    wx.request({
-      url,
-      method: 'GET',
-      header: { 'Content-Type': 'application/json' },
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          const raw = res.data && res.data.http_ip_base
-          const n = canonicalizeLiteratureApiBase(raw)
-          if (n) {
-            setCachedServerIpBase(n)
-            resolve(n)
-          } else {
-            reject(new Error('服务端未配置 LITERATURE_HTTP_IP_BASE'))
-          }
-        } else {
-          const d = res.data
-          const msg =
-            (d && (d.detail || d.message)) || 'HTTP ' + res.statusCode
-          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
-        }
-      },
-      fail(err) {
-        reject(new Error((err && err.errMsg) || '网络错误'))
-      },
-    })
+  return wxLiteratureRequest({
+    url,
+    method: 'GET',
+    header: { 'Content-Type': 'application/json' },
+  }).then((res) => {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      const raw = res.data && res.data.http_ip_base
+      const n = canonicalizeLiteratureApiBase(raw)
+      if (n) {
+        setCachedServerIpBase(n)
+        return n
+      }
+      throw new Error('服务端未配置 LITERATURE_HTTP_IP_BASE')
+    }
+    const d = res.data
+    const msg = (d && (d.detail || d.message)) || 'HTTP ' + res.statusCode
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
   })
 }
 
@@ -279,7 +318,13 @@ function wxRequestFailHints(errMsg, fullUrl) {
     parts.push('检查服务器 HTTPS 证书是否完整、是否被系统信任（勿用自签证书在未勾选不校验的环境）')
   }
   if (/timeout|超时/i.test(s)) {
-    parts.push('若为推荐 Feed：服务端可能在同步生成多条中文摘要，可稍后重试或缩小 limit')
+    if (/ERR_CONNECTION|net::ERR_CONNECTION|TIMED_OUT.*CONNECTION|连接超时/i.test(s)) {
+      parts.push(
+        '连接阶段超时：多为 DNS、运营商网络、安全组未放行 443，或「IP 直连」地址已失效；可关闭 IP 开关仅用 HTTPS 域名',
+      )
+    } else {
+      parts.push('若已能打开 /health：可能是单次请求耗时过长（如 Feed 多轮摘要），已延长客户端超时，仍失败可稍后再试')
+    }
   }
   if (/^http:\/\//i.test(String(fullUrl || ''))) {
     parts.push('真机与体验版必须使用 HTTPS（默认 443），勿用纯 HTTP')
@@ -306,42 +351,58 @@ function humanizeSystemConnectMsg(s) {
   return s
 }
 
-function request(path, method, data, retry401) {
-  const base = getBaseUrl()
+function request(path, method, data, retry401, reqExtra) {
+  const extra = reqExtra || {}
+  const base = extra.baseOverride != null ? extra.baseOverride : getBaseUrl()
   if (!base) {
     return Promise.reject(new Error('文献 API 根地址无效'))
   }
   const url = joinLiteratureApiUrl(base, path)
+  const usedDomainAfterIpFail = !!extra.usedDomainAfterIpFail
+
   const exec = () =>
-    new Promise((resolve, reject) => {
-    wx.request({
+    wxLiteratureRequest({
       url,
       method: method || 'GET',
-      data: method === 'GET' ? data : data,
+      data: data,
       header: buildAuthHeaders(),
-      success(res) {
+    })
+      .then((res) => {
         if (res.statusCode === 401 && getToken() && !retry401) {
           clearToken()
-          bootstrapWechatLogin()
+          return bootstrapWechatLogin()
             .then(() => request(path, method, data, true))
-            .then(resolve)
-            .catch(reject)
-          return
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data)
-        } else {
-          const d = res.data
-          const msg =
-            (d && (d.detail || d.message)) ||
-            res.errMsg ||
-            'HTTP ' + res.statusCode
-          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+          if (usedDomainAfterIpFail) {
+            setUseServerIp(false)
+          }
+          return res.data
         }
-      },
-      fail(err) {
-        const raw = (err && err.errMsg) || '网络错误'
+        const d = res.data
+        const msg =
+          (d && (d.detail || d.message)) || res.errMsg || 'HTTP ' + res.statusCode
+        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+      })
+      .catch((err) => {
+        const raw = (err && err.errMsg) || String(err || '网络错误')
         const errno = err && err.errno
+        const isWxRequestFail = !!(err && typeof err === 'object' && err.errMsg)
+        if (
+          isWxRequestFail &&
+          !usedDomainAfterIpFail &&
+          getUseServerIp() &&
+          isLikelyTransportLayerFailure(raw, errno)
+        ) {
+          const ipB = canonicalizeLiteratureApiBase(getCachedServerIpBase())
+          const dom = getDomainBaseUrl()
+          if (ipB && dom && base === ipB && dom !== ipB) {
+            return request(path, method, data, retry401, {
+              baseOverride: dom,
+              usedDomainAfterIpFail: true,
+            })
+          }
+        }
         let msg = humanizeSystemConnectMsg(raw)
         if (errno != null && String(errno) !== '') {
           msg += ' (errno:' + errno + ')'
@@ -354,10 +415,9 @@ function request(path, method, data, retry401) {
         if (hints.length) {
           msg += ' — ' + hints.join('；')
         }
-        reject(new Error(msg))
-      },
-    })
-  })
+        return Promise.reject(new Error(msg))
+      })
+
   if (retry401) {
     return exec()
   }

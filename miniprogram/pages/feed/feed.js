@@ -40,10 +40,13 @@ Page({
   },
 
   onLoad() {
-    api.ensureLoginAttempted().then(
-      () => this.loadFirst(true),
-      () => this.loadFirst(true),
-    )
+    api
+      .ensureLoginAttempted()
+      .then(
+        () => {},
+        () => {},
+      )
+      .then(() => this.loadFirst(true))
   },
 
   onChannel(e) {
