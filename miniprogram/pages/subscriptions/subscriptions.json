@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "订阅配置"
+  "navigationBarTitleText": "订阅配置",
+  "disableScroll": true
 }

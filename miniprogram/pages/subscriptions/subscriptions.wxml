@@ -1,6 +1,8 @@
-<view class="page">
-  <text class="intro">期刊支持目录或自定义 RSS；会议支持目录或 OpenAlex Source ID。保存后触发服务端抓取。</text>
-  <text wx:if="{{loadErr}}" class="err">{{loadErr}}</text>
+<view class="page-root">
+  <scroll-view scroll-y class="main-scroll" enhanced="{{true}}" show-scrollbar="{{true}}" enable-flex="{{true}}">
+    <view class="scroll-inner">
+      <text class="intro">期刊支持目录或自定义 RSS；会议支持目录或 OpenAlex Source ID。保存后触发服务端抓取。</text>
+      <text wx:if="{{loadErr}}" class="err">{{loadErr}}</text>
 
   <view class="tabs">
     <view class="tab {{subTab===0?'on':''}}" data-i="0" bindtap="setTab">期刊</view>
@@ -58,6 +60,8 @@
       </view>
     </block>
   </view>
+    </view>
+  </scroll-view>
 
   <view class="footer">
     <button class="btn-light" bindtap="restoreDefaults" disabled="{{!catalog}}">恢复推荐配置</button>

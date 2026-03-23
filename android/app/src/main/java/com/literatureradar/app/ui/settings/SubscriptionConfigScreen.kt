@@ -2,10 +2,12 @@ package com.literatureradar.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -114,6 +117,72 @@ fun SubscriptionConfigScreen(
                 },
             )
         },
+        bottomBar = {
+            Surface(
+                shadowElevation = 6.dp,
+                tonalElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TextButton(
+                            onClick = {
+                                val c = catalog ?: return@TextButton
+                                keywordItems.clear()
+                                keywordItems.addAll(c.defaultKeywords)
+                                journalItems.clear()
+                                journalItems.addAll(c.defaultJournals)
+                                conferenceItems.clear()
+                                conferenceItems.addAll(c.defaultConferences)
+                                hint = "已填入推荐配置（AI / 药物发现 / 分子设计），请点「保存到服务器」"
+                            },
+                            enabled = catalog != null,
+                        ) {
+                            Text("恢复推荐配置")
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            scope.launch(Dispatchers.IO) {
+                                runCatching {
+                                    api.putMySubscriptions(
+                                        UserSubscriptionsJson(
+                                            keywords = keywordItems.toList(),
+                                            journals = journalItems.toList(),
+                                            conferences = conferenceItems.toList(),
+                                        ),
+                                    )
+                                }
+                                    .onSuccess {
+                                        withContext(Dispatchers.Main) {
+                                            hint = "已保存"
+                                        }
+                                    }
+                                    .onFailure { e ->
+                                        withContext(Dispatchers.Main) {
+                                            hint = e.message ?: "保存失败"
+                                        }
+                                    }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("保存到服务器")
+                    }
+                    hint?.let { h ->
+                        Text(h, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            }
+        },
     ) { padding ->
         Column(
             Modifier
@@ -160,7 +229,8 @@ fun SubscriptionConfigScreen(
                     }
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
                     ) {
                         items(journalItems.size, key = { journalItems[it].id }) { idx ->
                             val item = journalItems[idx]
@@ -220,7 +290,8 @@ fun SubscriptionConfigScreen(
                     }
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
                     ) {
                         items(conferenceItems.size, key = { conferenceItems[it].id }) { idx ->
                             val item = conferenceItems[idx]
@@ -294,7 +365,8 @@ fun SubscriptionConfigScreen(
                     }
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
                     ) {
                         items(keywordItems.size, key = { "${keywordItems[it].text}-$it" }) { idx ->
                             val item = keywordItems[idx]
@@ -317,61 +389,6 @@ fun SubscriptionConfigScreen(
                     }
                 }
             }
-
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TextButton(
-                    onClick = {
-                        val c = catalog ?: return@TextButton
-                        keywordItems.clear()
-                        keywordItems.addAll(c.defaultKeywords)
-                        journalItems.clear()
-                        journalItems.addAll(c.defaultJournals)
-                        conferenceItems.clear()
-                        conferenceItems.addAll(c.defaultConferences)
-                        hint = "已填入推荐配置（AI / 药物发现 / 分子设计），请点「保存到服务器」"
-                    },
-                    enabled = catalog != null,
-                ) {
-                    Text("恢复推荐配置")
-                }
-            }
-
-            Button(
-                onClick = {
-                    scope.launch(Dispatchers.IO) {
-                        runCatching {
-                            api.putMySubscriptions(
-                                UserSubscriptionsJson(
-                                    keywords = keywordItems.toList(),
-                                    journals = journalItems.toList(),
-                                    conferences = conferenceItems.toList(),
-                                ),
-                            )
-                        }
-                            .onSuccess {
-                                withContext(Dispatchers.Main) {
-                                    hint = "已保存"
-                                }
-                            }
-                            .onFailure { e ->
-                                withContext(Dispatchers.Main) {
-                                    hint = e.message ?: "保存失败"
-                                }
-                            }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-            ) {
-                Text("保存到服务器")
-            }
-            hint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
 
