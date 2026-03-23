@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.data.PaperJson
+import com.literatureradar.app.data.feedBlurbRedundantWithAbstract
 import com.literatureradar.app.data.stripHtmlToPlain
 
 @Composable
@@ -101,7 +102,9 @@ fun PaperCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            val blurbLine = pickBlurb?.takeIf { it.isNotBlank() } ?: paper.feedBlurb.takeIf { it.isNotBlank() }
+            val abstractPlain = paper.abstract.stripHtmlToPlain()
+            val blurbRaw = pickBlurb?.takeIf { it.isNotBlank() } ?: paper.feedBlurb.takeIf { it.isNotBlank() }
+            val blurbLine = blurbRaw?.takeIf { !feedBlurbRedundantWithAbstract(it, abstractPlain) }
             blurbLine?.let { blurb ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -117,7 +120,7 @@ fun PaperCard(
                 }
             }
             Text(
-                text = paper.abstract.stripHtmlToPlain(),
+                text = abstractPlain,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,

@@ -1,6 +1,7 @@
 const {
   stripHtmlToPlain,
   heuristicOneLineFromAbstract,
+  isRedundantBlurb,
 } = require('../../utils/textPlain.js')
 
 function buildTagChips(p) {
@@ -35,6 +36,7 @@ Component({
     tagChips: [],
     summaryLine: '',
     abstractPlain: '',
+    hideAbstractDup: false,
   },
   lifetimes: {
     attached() {
@@ -61,11 +63,15 @@ Component({
       if (!pickStr && !fb) {
         fb = heuristicOneLineFromAbstract(p.abstract || '')
       }
-      const summary = pickStr || fb
+      const abstractPlain = stripHtmlToPlain((p && p.abstract) || '')
+      let summary = pickStr || fb
+      if (isRedundantBlurb(summary, abstractPlain)) {
+        summary = ''
+      }
       this.setData({
         tagChips: buildTagChips(p),
         summaryLine: summary,
-        abstractPlain: stripHtmlToPlain((p && p.abstract) || ''),
+        abstractPlain,
       })
     },
     onTap() {

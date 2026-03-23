@@ -18,7 +18,7 @@ from app.config import settings
 from app.models import Paper, UserProfile
 from app.database import SessionLocal
 from app.services.author_format import format_author_line
-from app.services.text_plain import strip_html_to_plain
+from app.services.text_plain import _is_metadata_only_abstract, strip_html_to_plain
 from app.services.openalex import (
     enrich_arxiv_citations,
     fetch_and_upsert_openalex,
@@ -134,6 +134,88 @@ def _parse_rss_date(entry) -> datetime | None:
     return None
 
 
+_RSS_TITLE_NOISE_SUBSTRINGS: tuple[str, ...] = (
+    "issue publication",
+    "editorial masthead",
+    "masthead",
+    "table of contents",
+    "in this issue",
+    "cover image",
+    "front cover",
+    "front matter",
+    "announcement",
+)
+
+_RSS_TITLE_SHORT_GENERIC_EXACT: frozenset[str] = frozenset(
+    {
+        "toc",
+        "contents",
+        "cover",
+        "masthead",
+        "editorial",
+        "issue contents",
+        "this issue",
+        "in brief",
+        "highlights",
+        "foreword",
+        "preface",
+    }
+)
+
+
+def _rss_entry_skip_noise(title: str) -> bool:
+    """期刊 RSS 目录页等非论文条目：标题噪声则跳过。"""
+    t = (title or "").strip()
+    if not t:
+        return True
+    low = t.casefold()
+    for s in _RSS_TITLE_NOISE_SUBSTRINGS:
+        if s in low:
+            return True
+    if len(t) <= 3:
+        return True
+    if low in _RSS_TITLE_SHORT_GENERIC_EXACT:
+        return True
+    if len(t) <= 18 and " " not in t and low in _RSS_TITLE_SHORT_GENERIC_EXACT:
+        return True
+    return False
+
+
+def _rss_content_values(entry) -> list[str]:
+    raw = getattr(entry, "content", None)
+    if not raw or not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        val = None
+        if hasattr(item, "value"):
+            val = getattr(item, "value", None)
+        elif isinstance(item, dict):
+            val = item.get("value")
+        if val is not None and str(val).strip():
+            out.append(str(val))
+    return out
+
+
+def _rss_best_summary(entry) -> str:
+    """优先 summary/description；若为卷期元信息则尝试 content[0].value 等。"""
+    raw_sum = entry.get("summary") or entry.get("description") or ""
+    summary_plain = strip_html_to_plain(raw_sum)
+    if summary_plain and not _is_metadata_only_abstract(summary_plain):
+        return summary_plain
+    for html in _rss_content_values(entry):
+        cplain = strip_html_to_plain(html)
+        if cplain and not _is_metadata_only_abstract(cplain):
+            return cplain
+    if summary_plain:
+        return summary_plain
+    for html in _rss_content_values(entry):
+        cplain = strip_html_to_plain(html)
+        if cplain:
+            return cplain
+    return ""
+
+
 def fetch_and_upsert_rss(db: Session, feed_url: str) -> int:
     parsed = feedparser.parse(feed_url)
     count = 0
@@ -143,7 +225,9 @@ def fetch_and_upsert_rss(db: Session, feed_url: str) -> int:
             continue
         ext_id = f"rss:{hashlib.md5(link.encode()).hexdigest()}"
         title = strip_html_to_plain(entry.get("title") or "")
-        summary = strip_html_to_plain(entry.get("summary") or entry.get("description") or "")
+        if _rss_entry_skip_noise(title):
+            continue
+        summary = _rss_best_summary(entry)
         published = _parse_rss_date(entry)
         source = f"rss:{urlparse(feed_url).netloc or 'feed'}"
         rss_authors: list[str] = []

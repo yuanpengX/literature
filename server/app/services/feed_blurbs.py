@@ -12,7 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Paper, PaperUserBlurb, UserProfile
-from app.services.text_plain import heuristic_feed_blurb_from_abstract, strip_html_to_plain
+from app.services.text_plain import (
+    feed_blurb_redundant_with_abstract,
+    heuristic_feed_blurb_from_abstract,
+    strip_html_to_plain,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +125,8 @@ def merge_blurbs_into_feed_items(
         b = (m.get(it.id, "") or "").strip()
         if not b:
             b = heuristic_feed_blurb_from_abstract(it.abstract)
+        if feed_blurb_redundant_with_abstract(b, it.abstract):
+            b = ""
         items[i] = it.model_copy(update={"feed_blurb": b})
 
 

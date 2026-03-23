@@ -1,5 +1,9 @@
 const api = require('../../utils/api.js')
-const { heuristicOneLineFromAbstract } = require('../../utils/textPlain.js')
+const {
+  heuristicOneLineFromAbstract,
+  isRedundantBlurb,
+  stripHtmlToPlain,
+} = require('../../utils/textPlain.js')
 
 function matchesChannel(paper, ch) {
   const s = paper.source || ''
@@ -15,7 +19,11 @@ function matchesChannel(paper, ch) {
 function normalizeFeedPaper(p) {
   if (!p || typeof p !== 'object') return p
   const fb0 = (p.feed_blurb || p.feedBlurb || '').trim()
-  const fb = fb0 || heuristicOneLineFromAbstract(p.abstract || '')
+  let fb = fb0 || heuristicOneLineFromAbstract(p.abstract || '')
+  const abstPlain = stripHtmlToPlain(p.abstract || '')
+  if (isRedundantBlurb(fb, abstPlain)) {
+    fb = ''
+  }
   return Object.assign({}, p, {
     feed_blurb: fb,
     authors_text: p.authors_text != null ? p.authors_text : p.authorsText || '',
