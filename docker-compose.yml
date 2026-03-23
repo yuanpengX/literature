@@ -1,0 +1,29 @@
+# 文献雷达 API — Docker 部署（默认 SQLite 持久化到卷）
+# 使用：在项目根目录执行  docker compose up -d --build
+#
+# 中国大陆：
+# - 拉取 python 镜像若慢，可配置 Docker 镜像加速（阿里云/ DaoCloud 等）后再 build
+# - 若容器内访问 arXiv 不稳定，可取消注释 HTTP(S)_PROXY 指向本机合法代理
+
+services:
+  literature-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "sqlite:////data/literature.db"
+      TZ: Asia/Shanghai
+      # httpx 默认会读取环境变量中的代理（trust_env）
+      # HTTP_PROXY: http://host.docker.internal:7890
+      # HTTPS_PROXY: http://host.docker.internal:7890
+      # 其他变量可在此追加，或复制 server/docker-compose.example.env 为 server/.env 后自行挂载/合并
+    volumes:
+      - literature_data:/data
+    restart: unless-stopped
+
+volumes:
+  literature_data:

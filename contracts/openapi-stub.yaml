@@ -1,0 +1,35 @@
+openapi: 3.0.3
+info:
+  title: Literature Radar API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /health:
+    get:
+      summary: Health
+      responses:
+        "200":
+          description: OK
+  /api/v1/feed:
+    get:
+      summary: Feed
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [recommended, recent] }
+      responses:
+        "200":
+          description: Feed page
+  /api/v1/events:
+    post:
+      summary: Analytics batch
+      responses:
+        "204":
+          description: No content

@@ -1,0 +1,57 @@
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Python ---
+**/.venv/
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+*.egg
+dist/
+build/
+
+# --- 环境变量（勿提交密钥）---
+.env
+.env.*
+!**/.env.example
+!**/docker-compose.example.env
+server/.env
+
+# --- 本地数据库 / 数据文件 ---
+*.db
+*.sqlite
+*.sqlite3
+server/literature.db
+
+# --- Android ---
+android/.gradle/
+android/**/build/
+android/build/
+android/local.properties
+android/captures/
+android/*.apk
+android/*.aab
+android/*.ap_
+android/.cxx/
+android/.kotlin/
+
+# --- IDE / 编辑器 ---
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# --- 日志与临时文件 ---
+*.log
+*.tmp
+*.temp
