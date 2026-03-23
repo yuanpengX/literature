@@ -29,7 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.ServiceLocator
 import com.literatureradar.app.data.AnalyticsEventJson
-import com.literatureradar.app.data.PaperJson
+import com.literatureradar.app.data.DailyPickItemJson
 import com.literatureradar.app.data.toEntity
 import com.literatureradar.app.ui.components.PaperCard
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +47,7 @@ fun DailyPicksScreen(
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
     var refreshing by remember { mutableStateOf(false) }
-    var items by remember { mutableStateOf<List<PaperJson>>(emptyList()) }
+    var items by remember { mutableStateOf<List<DailyPickItemJson>>(emptyList()) }
     var pickDate by remember { mutableStateOf("") }
     var note by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -64,7 +64,7 @@ fun DailyPicksScreen(
         subscriptionKeywords = r.subscriptionKeywords
         if (r.items.isNotEmpty()) {
             withContext(Dispatchers.IO) {
-                dao.upsertAll(r.items.map { it.toEntity() })
+                dao.upsertAll(r.items.map { it.paper.toEntity() })
             }
         }
     }
@@ -167,7 +167,7 @@ fun DailyPicksScreen(
                                             subscriptionKeywords = r.subscriptionKeywords
                                             if (r.items.isNotEmpty()) {
                                                 withContext(Dispatchers.IO) {
-                                                    dao.upsertAll(r.items.map { it.toEntity() })
+                                                    dao.upsertAll(r.items.map { it.paper.toEntity() })
                                                 }
                                             }
                                         }
@@ -191,20 +191,21 @@ fun DailyPicksScreen(
                                 )
                             }
                         }
-                        itemsIndexed(items, key = { _, p -> p.id }) { index, paper ->
+                        itemsIndexed(items, key = { _, row -> row.paper.id }) { index, row ->
                             PaperCard(
-                                paper = paper,
+                                paper = row.paper,
                                 position = index,
+                                pickBlurb = row.pickBlurb.takeIf { it.isNotBlank() },
                                 onClick = {
                                     analytics.log(
                                         AnalyticsEventJson(
                                             eventType = "paper_open",
-                                            paperId = paper.id,
+                                            paperId = row.paper.id,
                                             surface = "daily_picks",
                                             position = index,
                                         ),
                                     )
-                                    onOpenPaper(paper.id)
+                                    onOpenPaper(row.paper.id)
                                 },
                             )
                         }

@@ -21,8 +21,10 @@
     <view class="list" wx:else>
       <paper-card
         wx:for="{{items}}"
-        wx:key="id"
-        paper="{{item}}"
+        wx:for-item="row"
+        wx:key="paper.id"
+        paper="{{row.paper}}"
+        pick-blurb="{{row.pick_blurb}}"
         position="{{index}}"
         bind:open="onOpenPaper"
       />

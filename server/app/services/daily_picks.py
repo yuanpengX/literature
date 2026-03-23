@@ -1,4 +1,4 @@
-"""每日精选：合并 arXiv/期刊/会议候选，按用户关键词筛选后调用用户自备 LLM 选出 10 篇。"""
+"""每日精选：合并 arXiv/期刊/会议候选，按用户关键词筛选后调用用户自备 LLM 选出至多 10 篇，并附每篇一句推荐理由。"""
 
 from __future__ import annotations
 
@@ -15,10 +15,12 @@ from sqlalchemy.orm import Session, joinedload
 from app.catalog.presets import user_subscription_keywords_csv
 from app.config import settings
 from app.models import DailyPick, Paper, UserProfile
-from app.schemas import PaperOut
-from app.services.recommend import load_candidate_papers
+from app.schemas import DailyPickItemOut, PaperOut
+from app.services.recommend import load_candidate_papers, paper_to_out
 
 logger = logging.getLogger(__name__)
+
+BLURB_MAX_LEN = 100
 
 
 def _pick_date_str() -> str:
@@ -77,14 +79,22 @@ def _build_user_prompt(keywords_csv: str, papers: list[Paper]) -> str:
     for p in papers:
         abst = (p.abstract or "").replace("\n", " ").strip()[:lim]
         ch = p.source or "?"
-        lines.append(f"- id={p.id} | 通道={ch} | 标题={p.title}")
+        au = (p.authors_text or "").strip()
+        if au:
+            lines.append(f"- id={p.id} | 通道={ch} | 作者={au} | 标题={p.title}")
+        else:
+            lines.append(f"- id={p.id} | 通道={ch} | 标题={p.title}")
         lines.append(f"  摘要节选：{abst}")
         lines.append("")
     lines.append(
-        "请从这些候选中选出恰好 10 篇最值得该用户阅读的论文（若不足 10 篇则只返回实际数量）。"
-        "优先与关键词相关，并兼顾质量、新颖度与多样性（arXiv/期刊/会议可兼顾）。"
+        "请从这些候选中选出至多 10 篇最值得该用户阅读的论文（可少于 10）。"
+        "优先与关键词相关，并兼顾质量、新颖度与多样性。"
+        f"每一篇必须给一句中文推荐理由（不超过{BLURB_MAX_LEN}字），不要编造事实。"
     )
-    lines.append('仅输出一个 JSON 对象，不要 markdown 代码块，格式：{"paper_ids":[整数,...],"note":"一句中文简要说明"}')
+    lines.append(
+        "仅输出一个 JSON 对象，不要 markdown 代码块。格式示例："
+        '{"picks":[{"paper_id":123,"blurb":"一句推荐理由"},...],"note":"对今日选集的整体一句说明"}'
+    )
     return "\n".join(lines)
 
 
@@ -108,7 +118,7 @@ def _call_user_llm(base_url: str, api_key: str, model: str, user_prompt: str) ->
         "messages": [
             {
                 "role": "system",
-                "content": "你是学术文献策展助手。只输出单个 JSON 对象，键为 paper_ids 与 note，不要其它文字。",
+                "content": "你是学术文献策展助手。只输出单个 JSON 对象，含 picks 数组（paper_id、blurb）与可选 note，不要其它文字。",
             },
             {"role": "user", "content": user_prompt},
         ],
@@ -126,21 +136,76 @@ def _call_user_llm(base_url: str, api_key: str, model: str, user_prompt: str) ->
     return (msg.get("content") or "").strip()
 
 
-def _parse_llm_choice_ids(raw: str, valid_ids: set[int]) -> tuple[list[int], str]:
-    obj = _extract_json_obj(raw)
-    raw_ids = obj.get("paper_ids") or obj.get("ids") or []
+def _parse_llm_daily_response(obj: dict, valid_ids: set[int]) -> tuple[list[tuple[int, str]], str]:
     note = str(obj.get("note") or obj.get("reason") or "").strip()
-    out: list[int] = []
+    picks = obj.get("picks")
+    if isinstance(picks, list) and picks:
+        out: list[tuple[int, str]] = []
+        seen: set[int] = set()
+        for item in picks:
+            if not isinstance(item, dict):
+                continue
+            raw_pid = item.get("paper_id", item.get("id"))
+            try:
+                pid = int(raw_pid)
+            except (TypeError, ValueError):
+                continue
+            if pid not in valid_ids or pid in seen:
+                continue
+            blurb = str(item.get("blurb") or item.get("why") or "").strip()
+            if len(blurb) > BLURB_MAX_LEN:
+                blurb = blurb[: BLURB_MAX_LEN - 1] + "…"
+            out.append((pid, blurb))
+            seen.add(pid)
+            if len(out) >= 10:
+                break
+        if out:
+            return out, note
+
+    raw_ids = obj.get("paper_ids") or obj.get("ids") or []
+    legacy: list[int] = []
     for x in raw_ids:
         try:
             pid = int(x)
         except (TypeError, ValueError):
             continue
-        if pid in valid_ids and pid not in out:
-            out.append(pid)
-        if len(out) >= 10:
+        if pid in valid_ids and pid not in legacy:
+            legacy.append(pid)
+        if len(legacy) >= 10:
             break
-    return out, note
+    return [(pid, "") for pid in legacy], note
+
+
+def _stored_payload_from_pairs(pairs: list[tuple[int, str]]) -> str:
+    return json.dumps(
+        [{"paper_id": a, "blurb": b} for a, b in pairs],
+        ensure_ascii=False,
+    )
+
+
+def _parse_stored_daily_items(json_str: str) -> tuple[list[int], dict[int, str]]:
+    try:
+        data = json.loads(json_str or "[]")
+    except json.JSONDecodeError:
+        return [], {}
+    if not isinstance(data, list) or not data:
+        return [], {}
+    if all(isinstance(x, int) for x in data):
+        return [int(x) for x in data], {}
+    ids: list[int] = []
+    blurbs: dict[int, str] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        raw = item.get("paper_id", item.get("id"))
+        try:
+            pid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        ids.append(pid)
+        b = str(item.get("blurb") or "").strip()[:200]
+        blurbs[pid] = b
+    return ids, blurbs
 
 
 def generate_daily_pick_for_user(db: Session, user: UserProfile, pick_date: str | None = None) -> None:
@@ -163,11 +228,11 @@ def generate_daily_pick_for_user(db: Session, user: UserProfile, pick_date: str 
     kcsv = user_subscription_keywords_csv(user)
     candidates = _filter_by_keywords(merged, kcsv)
     if len(candidates) < 1:
-        _upsert_daily_pick(
+        _upsert_daily_pick_payload(
             db,
             user.user_id,
             pick_date,
-            [],
+            "[]",
             "",
             error_message="候选论文为空，请先完成抓取或放宽关键词",
         )
@@ -178,40 +243,41 @@ def generate_daily_pick_for_user(db: Session, user: UserProfile, pick_date: str 
     prompt = _build_user_prompt(kcsv, candidates)
     try:
         raw = _call_user_llm(user.llm_base_url, user.llm_api_key, user.llm_model, prompt)
-        ids, note = _parse_llm_choice_ids(raw, valid_ids)
-        if not ids:
-            raise ValueError("LLM 未返回有效 paper_ids")
-        _upsert_daily_pick(db, user.user_id, pick_date, ids, note, error_message=None)
+        obj = _extract_json_obj(raw)
+        pairs, note = _parse_llm_daily_response(obj, valid_ids)
+        if not pairs:
+            raise ValueError("LLM 未返回有效 picks 或 paper_ids")
+        payload = _stored_payload_from_pairs(pairs)
+        _upsert_daily_pick_payload(db, user.user_id, pick_date, payload, note, error_message=None)
     except Exception as e:
         logger.warning("daily_pick user=%s failed: %s", user.user_id, e)
-        _upsert_daily_pick(db, user.user_id, pick_date, [], "", error_message=str(e)[:2000])
+        _upsert_daily_pick_payload(db, user.user_id, pick_date, "[]", "", error_message=str(e)[:2000])
     db.commit()
 
 
-def _upsert_daily_pick(
+def _upsert_daily_pick_payload(
     db: Session,
     user_id: str,
     pick_date: str,
-    paper_ids: list[int],
+    paper_ids_json: str,
     note: str,
     error_message: str | None,
 ) -> None:
     row = db.execute(
         select(DailyPick).where(DailyPick.user_id == user_id, DailyPick.pick_date == pick_date)
     ).scalar_one_or_none()
-    payload = json.dumps(paper_ids, ensure_ascii=False)
     if row is None:
         db.add(
             DailyPick(
                 user_id=user_id,
                 pick_date=pick_date,
-                paper_ids_json=payload,
+                paper_ids_json=paper_ids_json,
                 curator_note=note or "",
                 error_message=error_message,
             )
         )
     else:
-        row.paper_ids_json = payload
+        row.paper_ids_json = paper_ids_json
         row.curator_note = note or ""
         row.error_message = error_message
 
@@ -232,8 +298,9 @@ def run_daily_picks_for_all_users(db: Session) -> int:
     return n
 
 
-def load_daily_pick_papers(db: Session, user_id: str, pick_date: str) -> tuple[list[PaperOut], str | None, str | None]:
-    """返回 (有序论文, 策展说明, 错误信息)。"""
+def load_daily_pick_items(
+    db: Session, user_id: str, pick_date: str
+) -> tuple[list[DailyPickItemOut], str | None, str | None]:
     row = db.execute(
         select(DailyPick).where(DailyPick.user_id == user_id, DailyPick.pick_date == pick_date)
     ).scalar_one_or_none()
@@ -241,38 +308,17 @@ def load_daily_pick_papers(db: Session, user_id: str, pick_date: str) -> tuple[l
         return [], None, None
     if row.error_message:
         return [], row.curator_note or None, row.error_message
-    try:
-        ids = json.loads(row.paper_ids_json or "[]")
-    except json.JSONDecodeError:
-        return [], None, "解析 paper_ids 失败"
-    if not isinstance(ids, list) or not ids:
+    ids, blurbs = _parse_stored_daily_items(row.paper_ids_json or "[]")
+    if not ids:
         return [], row.curator_note or None, row.error_message
     stmt = select(Paper).options(joinedload(Paper.stats)).where(Paper.id.in_(ids))
     by_id = {p.id: p for p in db.scalars(stmt).unique().all()}
-    ordered: list[PaperOut] = []
-    for i in ids:
-        try:
-            pid = int(i)
-        except (TypeError, ValueError):
-            continue
+    ordered: list[DailyPickItemOut] = []
+    for pid in ids:
         p = by_id.get(pid)
         if p is None:
             continue
         hs = p.stats.hot_score if p.stats is not None else 0.0
-        ordered.append(
-            PaperOut(
-                id=p.id,
-                external_id=p.external_id,
-                title=p.title,
-                abstract=p.abstract,
-                pdf_url=p.pdf_url,
-                html_url=p.html_url,
-                source=p.source,
-                primary_category=p.primary_category,
-                published_at=p.published_at,
-                citation_count=p.citation_count,
-                hot_score=hs,
-                rank_reason="recent",
-            )
-        )
+        po = paper_to_out(p, "recent", hs)
+        ordered.append(DailyPickItemOut(paper=po, pick_blurb=blurbs.get(pid, "")))
     return ordered, row.curator_note or None, None

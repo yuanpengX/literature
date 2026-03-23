@@ -40,6 +40,24 @@ def _norm(values: list[float]) -> list[float]:
     return [(v - lo) / (hi - lo) for v in values]
 
 
+def paper_to_out(p: Paper, rank_reason: str | None, hot_score: float) -> PaperOut:
+    return PaperOut(
+        id=p.id,
+        external_id=p.external_id,
+        title=p.title,
+        abstract=p.abstract,
+        authors_text=(p.authors_text or "").strip(),
+        pdf_url=p.pdf_url,
+        html_url=p.html_url,
+        source=p.source,
+        primary_category=p.primary_category,
+        published_at=p.published_at,
+        citation_count=p.citation_count,
+        hot_score=hot_score,
+        rank_reason=rank_reason,  # type: ignore[arg-type]
+    )
+
+
 def papers_to_feed_items(
     papers: list[Paper],
     user: UserProfile | None,
@@ -64,13 +82,20 @@ def papers_to_feed_items(
     int_n = _norm(interest_raw)
     rec_n = _norm(recency_raw)
 
+    sort_key = (sort or "recommended").strip().lower()
     scored: list[tuple[Paper, float, str | None]] = []
     for i, p in enumerate(papers):
-        if sort == "recent":
+        if sort_key == "recent":
             ref = p.published_at or p.ingested_at or now
             if ref.tzinfo is None:
                 ref = ref.replace(tzinfo=timezone.utc)
             scored.append((p, ref.timestamp(), None))
+        elif sort_key == "hot":
+            final = hot_n[i] * 0.92 + rec_n[i] * 0.08
+            scored.append((p, final, "trending"))
+        elif sort_key == "for_you":
+            final = int_n[i] * 0.82 + rec_n[i] * 0.18
+            scored.append((p, final, "for_you"))
         else:
             final = (
                 settings.recommend_alpha_hot * hot_n[i]
@@ -88,23 +113,8 @@ def papers_to_feed_items(
     out: list[PaperOut] = []
     for p, _, reason in scored:
         hs = p.stats.hot_score if p.stats is not None else 0.0
-        rr = None if sort == "recent" else reason
-        out.append(
-            PaperOut(
-                id=p.id,
-                external_id=p.external_id,
-                title=p.title,
-                abstract=p.abstract,
-                pdf_url=p.pdf_url,
-                html_url=p.html_url,
-                source=p.source,
-                primary_category=p.primary_category,
-                published_at=p.published_at,
-                citation_count=p.citation_count,
-                hot_score=hs,
-                rank_reason=rr,  # type: ignore[arg-type]
-            )
-        )
+        rr = None if sort_key == "recent" else reason
+        out.append(paper_to_out(p, rr, hs))
     return out
 
 

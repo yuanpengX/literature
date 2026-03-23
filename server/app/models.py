@@ -13,6 +13,7 @@ class Paper(Base):
     external_id: Mapped[str] = mapped_column(String(256), unique=True, index=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     abstract: Mapped[str] = mapped_column(Text, default="")
+    authors_text: Mapped[str] = mapped_column(Text, default="")  # 展示用，如 "A, B et al."
     pdf_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     html_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source: Mapped[str] = mapped_column(String(64), index=True)  # arxiv, rss:host

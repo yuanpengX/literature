@@ -1,5 +1,13 @@
 const api = require('../../utils/api.js')
 
+function normalizeDailyItems(raw) {
+  const list = Array.isArray(raw) ? raw : []
+  return list.map((row) => {
+    if (row && row.paper) return row
+    return { paper: row, pick_blurb: '' }
+  })
+}
+
 Page({
   data: {
     loading: true,
@@ -22,7 +30,7 @@ Page({
       const r = await api.getDailyPicks()
       const kws = r.subscription_keywords || []
       this.setData({
-        items: r.items || [],
+        items: normalizeDailyItems(r.items),
         pickDate: r.date || '',
         note: r.note || '',
         error: r.error || '',
@@ -46,7 +54,7 @@ Page({
       const r = await api.runDailyPicksNow()
       const kws = r.subscription_keywords || []
       this.setData({
-        items: r.items || [],
+        items: normalizeDailyItems(r.items),
         pickDate: r.date || '',
         note: r.note || '',
         error: r.error || '',

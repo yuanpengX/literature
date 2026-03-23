@@ -9,6 +9,7 @@ class PaperOut(BaseModel):
     external_id: str
     title: str
     abstract: str
+    authors_text: str = ""
     pdf_url: str | None
     html_url: str | None
     source: str
@@ -71,9 +72,14 @@ class WeChatLoginResponse(BaseModel):
     expires_in: int
 
 
+class DailyPickItemOut(BaseModel):
+    paper: PaperOut
+    pick_blurb: str = Field(default="", description="大模型为该篇生成的一句推荐理由")
+
+
 class DailyPicksResponse(BaseModel):
     date: str
-    items: list[PaperOut]
+    items: list[DailyPickItemOut]
     note: str | None = None
     error: str | None = None
     server_llm_configured: bool = False

@@ -48,6 +48,12 @@ private enum class FeedChannel(val apiValue: String, val label: String) {
     Conference("conference", "会议"),
 }
 
+/** 与后端 `GET /feed?sort=` 一致 */
+private enum class FeedSort(val apiValue: String, val label: String) {
+    Hot("hot", "热门"),
+    ForYou("for_you", "为你推荐"),
+}
+
 private fun PaperEntity.matchesChannel(ch: FeedChannel): Boolean = when (ch) {
     FeedChannel.Arxiv -> source == "arxiv"
     FeedChannel.Journal ->
@@ -79,6 +85,7 @@ fun FeedScreen(
     val analytics = ServiceLocator.analytics
     val scope = rememberCoroutineScope()
     var selectedChannel by remember { mutableStateOf(FeedChannel.Arxiv) }
+    var selectedSort by remember { mutableStateOf(FeedSort.ForYou) }
     var items by remember { mutableStateOf<List<PaperJson>>(emptyList()) }
     var nextCursor by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -104,7 +111,7 @@ fun FeedScreen(
         val res = ServiceLocator.api.getFeed(
             cursor = null,
             limit = 30,
-            sort = "recommended",
+            sort = selectedSort.apiValue,
             channel = selectedChannel.apiValue,
         )
         items = res.items.filter { it.matchesChannel(selectedChannel) }
@@ -124,7 +131,7 @@ fun FeedScreen(
             val res = ServiceLocator.api.getFeed(
                 cursor = c,
                 limit = 30,
-                sort = "recommended",
+                sort = selectedSort.apiValue,
                 channel = selectedChannel.apiValue,
             )
             if (res.items.isEmpty()) {
@@ -142,7 +149,7 @@ fun FeedScreen(
         }
     }
 
-    LaunchedEffect(selectedChannel) {
+    LaunchedEffect(selectedChannel, selectedSort) {
         error = null
         nextCursor = null
         withContext(Dispatchers.IO) {
@@ -180,6 +187,15 @@ fun FeedScreen(
                             selected = selectedChannel == ch,
                             onClick = { selectedChannel = ch },
                             text = { Text(ch.label) },
+                        )
+                    }
+                }
+                TabRow(selectedTabIndex = selectedSort.ordinal) {
+                    FeedSort.entries.forEach { s ->
+                        Tab(
+                            selected = selectedSort == s,
+                            onClick = { selectedSort = s },
+                            text = { Text(s.label) },
                         )
                     }
                 }

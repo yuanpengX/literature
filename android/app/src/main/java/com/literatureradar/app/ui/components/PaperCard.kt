@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.literatureradar.app.data.PaperJson
@@ -22,13 +25,16 @@ fun PaperCard(
     position: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 每日精选等场景：展示一句推荐理由 */
+    pickBlurb: String? = null,
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -64,6 +70,29 @@ fun PaperCard(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (paper.authorsText.isNotBlank()) {
+                Text(
+                    text = paper.authorsText,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            pickBlurb?.takeIf { it.isNotBlank() }?.let { blurb ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                ) {
+                    Text(
+                        text = blurb,
+                        style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    )
+                }
+            }
             Text(
                 text = paper.abstract,
                 style = MaterialTheme.typography.bodyMedium,

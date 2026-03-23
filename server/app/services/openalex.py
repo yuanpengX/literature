@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Paper
+from app.services.author_format import openalex_authors_from_work
 
 logger = logging.getLogger(__name__)
 
@@ -128,10 +129,14 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
         else:
             paper_source = "openalex"
 
+        authors_text = openalex_authors_from_work(w)
+
         existing = db.execute(select(Paper).where(Paper.external_id == ext_id)).scalar_one_or_none()
         if existing:
             existing.title = title
             existing.abstract = abstract
+            if authors_text:
+                existing.authors_text = authors_text
             existing.pdf_url = pdf_url
             existing.html_url = html_url
             existing.primary_category = primary
@@ -145,6 +150,7 @@ def _upsert_openalex_works_batch(db: Session, results: list) -> int:
                     external_id=ext_id,
                     title=title,
                     abstract=abstract,
+                    authors_text=authors_text,
                     pdf_url=pdf_url,
                     html_url=html_url,
                     source=paper_source,

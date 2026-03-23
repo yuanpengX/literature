@@ -1,9 +1,9 @@
 .card {
   background-color: #F7F2FA;
-  border-radius: 16rpx;
+  border-radius: 20rpx;
   padding: 32rpx;
   margin-bottom: 24rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4rpx 16rpx rgba(61, 90, 254, 0.08), 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
 }
 
 .row-tags {
@@ -24,6 +24,28 @@
 
 .tag-muted {
   color: #49454F;
+}
+
+.authors {
+  display: block;
+  font-size: 24rpx;
+  color: #49454F;
+  margin-bottom: 12rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick-blurb {
+  display: block;
+  font-size: 24rpx;
+  font-style: italic;
+  color: #381E72;
+  background: rgba(61, 90, 254, 0.12);
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 12rpx;
+  line-height: 1.45;
 }
 
 .title {

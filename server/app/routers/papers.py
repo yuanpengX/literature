@@ -21,6 +21,7 @@ def get_paper(paper_id: int, db: Session = Depends(get_db)):
         external_id=p.external_id,
         title=p.title,
         abstract=p.abstract,
+        authors_text=(p.authors_text or "").strip(),
         pdf_url=p.pdf_url,
         html_url=p.html_url,
         source=p.source,

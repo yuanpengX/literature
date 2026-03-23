@@ -17,6 +17,7 @@ from app.catalog.presets import CONFERENCE_PRESETS, JOURNAL_PRESETS
 from app.config import settings
 from app.models import Paper, UserProfile
 from app.database import SessionLocal
+from app.services.author_format import format_author_line
 from app.services.openalex import (
     enrich_arxiv_citations,
     fetch_and_upsert_openalex,
@@ -80,10 +81,18 @@ def fetch_and_upsert_arxiv(db: Session) -> int:
             elif link.get("rel") == "alternate" and href:
                 html_url = href
 
+        author_names: list[str] = []
+        for auth_el in entry.findall("atom:author", ARXIV_NS):
+            ne = auth_el.find("atom:name", ARXIV_NS)
+            if ne is not None and (ne.text or "").strip():
+                author_names.append(" ".join((ne.text or "").split()))
+        authors_text = format_author_line(author_names)
+
         existing = db.execute(select(Paper).where(Paper.external_id == ext_id)).scalar_one_or_none()
         if existing:
             existing.title = title
             existing.abstract = abstract
+            existing.authors_text = authors_text or existing.authors_text
             existing.pdf_url = pdf_url
             existing.html_url = html_url
             existing.primary_category = primary
@@ -95,6 +104,7 @@ def fetch_and_upsert_arxiv(db: Session) -> int:
                     external_id=ext_id,
                     title=title,
                     abstract=abstract,
+                    authors_text=authors_text,
                     pdf_url=pdf_url,
                     html_url=html_url,
                     source="arxiv",
@@ -135,11 +145,23 @@ def fetch_and_upsert_rss(db: Session, feed_url: str) -> int:
         summary = (entry.get("summary") or entry.get("description") or "").strip()
         published = _parse_rss_date(entry)
         source = f"rss:{urlparse(feed_url).netloc or 'feed'}"
+        rss_authors: list[str] = []
+        if getattr(entry, "author", None):
+            rss_authors.append(str(entry.author).strip())
+        if getattr(entry, "authors", None):
+            for a in entry.authors:
+                if hasattr(a, "name") and a.name:
+                    rss_authors.append(str(a.name).strip())
+                elif isinstance(a, str):
+                    rss_authors.append(a.strip())
+        authors_text = format_author_line(rss_authors, max_show=5)
 
         existing = db.execute(select(Paper).where(Paper.external_id == ext_id)).scalar_one_or_none()
         if existing:
             existing.title = title or existing.title
             existing.abstract = summary or existing.abstract
+            if authors_text:
+                existing.authors_text = authors_text
             existing.html_url = link
             if published:
                 existing.published_at = published
@@ -149,6 +171,7 @@ def fetch_and_upsert_rss(db: Session, feed_url: str) -> int:
                     external_id=ext_id,
                     title=title or "(no title)",
                     abstract=summary,
+                    authors_text=authors_text,
                     pdf_url=None,
                     html_url=link,
                     source=source,

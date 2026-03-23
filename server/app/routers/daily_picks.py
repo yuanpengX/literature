@@ -11,7 +11,7 @@ from app.schemas import DailyPicksResponse
 from app.services.daily_picks import (
     _pick_date_str,
     generate_daily_pick_for_user,
-    load_daily_pick_papers,
+    load_daily_pick_items,
 )
 
 router = APIRouter(prefix="/daily-picks", tags=["daily-picks"])
@@ -33,7 +33,7 @@ def get_my_daily_picks(
 ):
     d = (date or "").strip() or _pick_date_str()
     u = db.get(UserProfile, user_id)
-    items, note, err = load_daily_pick_papers(db, user_id, d)
+    items, note, err = load_daily_pick_items(db, user_id, d)
     kws = user_subscription_keywords_list(u) if u is not None else []
     return DailyPicksResponse(
         date=d,
@@ -62,7 +62,7 @@ def run_my_daily_pick_now(
         db.delete(row)
         db.commit()
     generate_daily_pick_for_user(db, u, pick_date)
-    items, note, err = load_daily_pick_papers(db, user_id, pick_date)
+    items, note, err = load_daily_pick_items(db, user_id, pick_date)
     kws = user_subscription_keywords_list(u)
     return DailyPicksResponse(
         date=pick_date,

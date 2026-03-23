@@ -66,17 +66,21 @@ def ensure_papers_schema(engine) -> None:
     """Add columns introduced after first deploy (SQLite / Postgres)."""
     try:
         insp = inspect(engine)
+        if not insp.has_table("papers"):
+            return
         cols = {c["name"] for c in insp.get_columns("papers")}
     except Exception:
         return
-    if "citation_synced_at" in cols:
-        return
     url = str(engine.url)
+    is_sqlite = "sqlite" in url
     with engine.begin() as conn:
-        if "sqlite" in url:
-            conn.execute(text("ALTER TABLE papers ADD COLUMN citation_synced_at DATETIME"))
-        else:
-            conn.execute(text("ALTER TABLE papers ADD COLUMN citation_synced_at TIMESTAMPTZ"))
+        if "citation_synced_at" not in cols:
+            if is_sqlite:
+                conn.execute(text("ALTER TABLE papers ADD COLUMN citation_synced_at DATETIME"))
+            else:
+                conn.execute(text("ALTER TABLE papers ADD COLUMN citation_synced_at TIMESTAMPTZ"))
+        if "authors_text" not in cols:
+            conn.execute(text("ALTER TABLE papers ADD COLUMN authors_text TEXT DEFAULT ''"))
 
 
 def get_db() -> Generator[Session, None, None]:

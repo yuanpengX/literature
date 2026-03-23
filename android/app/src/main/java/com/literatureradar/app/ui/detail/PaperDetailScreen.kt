@@ -168,6 +168,13 @@ fun PaperDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(p.title, style = MaterialTheme.typography.titleLarge)
+                    if (p.authorsText.isNotBlank()) {
+                        Text(
+                            p.authorsText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text("${p.source} · ${p.externalId}", style = MaterialTheme.typography.labelSmall)
                     if (p.citationCount > 0) {
                         Text(

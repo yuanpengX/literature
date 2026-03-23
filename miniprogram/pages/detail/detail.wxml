@@ -7,6 +7,7 @@
         <button class="fav-btn" size="mini" bindtap="onFavoriteTap">{{isFavorite ? '★ 已收藏' : '☆ 收藏'}}</button>
       </view>
       <text class="title">{{paper.title}}</text>
+      <text wx:if="{{paper.authors_text}}" class="authors">{{paper.authors_text}}</text>
       <text class="sub">{{paper.source}} · {{paper.external_id}}</text>
       <text wx:if="{{paper.citation_count > 0}}" class="cite">引用（OpenAlex）{{paper.citation_count}}</text>
       <text class="sec-title">摘要</text>

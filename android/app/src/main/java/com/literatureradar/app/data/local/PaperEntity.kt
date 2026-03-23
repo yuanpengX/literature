@@ -9,6 +9,7 @@ data class PaperEntity(
     val externalId: String,
     val title: String,
     val abstract: String,
+    val authorsText: String = "",
     val pdfUrl: String?,
     val htmlUrl: String?,
     val source: String,

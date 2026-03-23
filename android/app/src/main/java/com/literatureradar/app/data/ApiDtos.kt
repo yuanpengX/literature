@@ -20,6 +20,7 @@ data class PaperJson(
     @SerialName("external_id") val externalId: String,
     val title: String,
     val abstract: String,
+    @SerialName("authors_text") val authorsText: String = "",
     @SerialName("pdf_url") val pdfUrl: String? = null,
     @SerialName("html_url") val htmlUrl: String? = null,
     val source: String,
@@ -53,9 +54,15 @@ data class UserLlmCredentialsBody(
 )
 
 @Serializable
+data class DailyPickItemJson(
+    val paper: PaperJson,
+    @SerialName("pick_blurb") val pickBlurb: String = "",
+)
+
+@Serializable
 data class DailyPicksResponseJson(
     val date: String,
-    val items: List<PaperJson> = emptyList(),
+    val items: List<DailyPickItemJson> = emptyList(),
     val note: String? = null,
     val error: String? = null,
     @SerialName("server_llm_configured") val serverLlmConfigured: Boolean = false,

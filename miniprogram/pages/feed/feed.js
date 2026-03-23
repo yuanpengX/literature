@@ -13,6 +13,7 @@ function matchesChannel(paper, ch) {
 Page({
   data: {
     channel: 'arxiv',
+    sort: 'for_you',
     items: [],
     nextCursor: null,
     loading: true,
@@ -31,10 +32,17 @@ Page({
     this.loadFirst(true)
   },
 
+  onSort(e) {
+    const s = e.currentTarget.dataset.sort
+    if (!s || s === this.data.sort) return
+    this.setData({ sort: s, items: [], nextCursor: null, error: '' })
+    this.loadFirst(true)
+  },
+
   async loadFirst(showLoading) {
     if (showLoading) this.setData({ loading: true, error: '' })
     try {
-      const res = await api.getFeed(null, 30, 'recommended', this.data.channel)
+      const res = await api.getFeed(null, 30, this.data.sort, this.data.channel)
       const raw = res.items || []
       const items = raw.filter((p) => matchesChannel(p, this.data.channel))
       this.setData({
@@ -64,7 +72,7 @@ Page({
     if (!c || this.data.loadingMore) return
     this.setData({ loadingMore: true })
     try {
-      const res = await api.getFeed(c, 30, 'recommended', this.data.channel)
+      const res = await api.getFeed(c, 30, this.data.sort, this.data.channel)
       const raw = res.items || []
       const page = raw.filter((p) => matchesChannel(p, this.data.channel))
       const items = this.data.items.concat(page)

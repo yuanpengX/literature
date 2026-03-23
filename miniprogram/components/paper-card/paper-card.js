@@ -15,6 +15,10 @@ Component({
       type: Number,
       value: 0,
     },
+    pickBlurb: {
+      type: String,
+      value: '',
+    },
   },
   data: {
     reasonLabel: '',

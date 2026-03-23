@@ -5,5 +5,7 @@
     <text wx:if="{{paper.citation_count > 0}}" class="tag tag-muted">引用 {{paper.citation_count}}</text>
   </view>
   <text class="title">{{paper.title}}</text>
+  <text wx:if="{{paper.authors_text}}" class="authors">{{paper.authors_text}}</text>
+  <view wx:if="{{pickBlurb}}" class="pick-blurb">{{pickBlurb}}</view>
   <text class="abstract">{{paper.abstract}}</text>
 </view>
