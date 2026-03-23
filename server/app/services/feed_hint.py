@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
 # 与产品说明一致，固定返回给客户端
 FEED_PIPELINE_NOTE_ZH = (
-    "服务端顺序：合并多频道候选 → 按订阅做相关性预筛 → 再按当前 Tab 频道过滤 → "
-    "按所选排序排好序 → 最后才同步调用您配置的大模型生成卡片中文摘要。"
+    "服务端顺序：合并多频道候选 → 仅保留标题或摘要命中已启用订阅关键词的论文 → 再按当前 Tab 频道过滤 → "
+    "按所选排序排好序 → 最后才同步调用您配置的大模型生成卡片中文摘要（无摘要的条目不返回，后台补全后下刷可见）。"
 )
 
 
@@ -62,7 +62,7 @@ def hint_for_zero_ordered(
     filtered_n: int,
     papers_n: int,
     channel_label: str,
-    strict_sub: bool,
+    subscription_keywords_enabled_count: int,
 ) -> tuple[str, str]:
     if merged_n <= 0:
         return (
@@ -70,11 +70,16 @@ def hint_for_zero_ordered(
             "近期库内合并候选为 0（各频道在上限内没有可用论文）。请稍后下拉刷新触发抓取，或在「订阅配置」中增加关键词、期刊与会议后再下拉。",
         )
     if filtered_n <= 0:
-        strict_tip = "当前开启了「严格按订阅过滤」。" if strict_sub else ""
+        if subscription_keywords_enabled_count <= 0:
+            return (
+                "no_subscription_keywords",
+                f"合并候选共 {merged_n} 篇，但您尚未在订阅中启用任何关键词；推荐列表只展示标题或摘要命中已启用关键词的论文。"
+                "请到「订阅配置」启用至少一个关键词后再下拉刷新。",
+            )
         return (
             "subscription_filtered_empty",
-            f"合并候选共 {merged_n} 篇，但按订阅（关键词 / 期刊 / 会议）预筛后一篇都不剩。{strict_tip}"
-            "请放宽订阅条件、多选来源，或联系管理员调整 FEED_STRICT_SUBSCRIPTION_FILTER。",
+            f"合并候选共 {merged_n} 篇，但没有任何一篇在标题或摘要中命中您已启用的订阅关键词。"
+            "请增加或调整关键词，或稍后下拉刷新以拉取更多文献后再试。",
         )
     if papers_n <= 0:
         return (

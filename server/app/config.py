@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     recommend_alpha_hot: float = 0.45
     recommend_beta_interest: float = 0.45
     recommend_gamma_recency: float = 0.10
-    # Feed：与每日精选同源订阅预筛；无启用订阅且为 true 时返回空列表
+    # 已废弃：预筛现为「仅标题/摘要命中已启用关键词」；该开关不再改变行为，保留仅为兼容旧 .env
     feed_strict_subscription_filter: bool = False  # FEED_STRICT_SUBSCRIPTION_FILTER
     feed_merge_max_total: int = 900  # FEED_MERGE_MAX_TOTAL
     feed_merge_per_channel: int = 350  # FEED_MERGE_PER_CHANNEL

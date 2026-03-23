@@ -150,6 +150,7 @@ def get_feed(
         user,
         strict=settings.feed_strict_subscription_filter,
     )
+    subscription_kw_count = len(user_subscription_keywords_list(user)) if user is not None else 0
     papers = [p for p in filtered if paper_matches_feed_channel(p, ch)]
     ordered = papers_to_feed_items(papers, user, sort)
 
@@ -223,7 +224,7 @@ def get_feed(
             len(filtered),
             len(papers),
             _channel_label(ch),
-            settings.feed_strict_subscription_filter,
+            subscription_kw_count,
         )
         logger.info(
             "feed response empty reason=zero_ordered user=%s hint=%s merged=%s filtered=%s papers=%s",
