@@ -63,7 +63,7 @@ docker compose up -d --build
 - 健康检查：`GET http://<主机IP>/health`
 - 数据：`SQLite` 在卷 **`literature_data`** → `/data/literature.db`
 
-可选环境变量：复制 [`server/.env.example`](server/.env.example) 为 `server/.env`。
+可选环境变量：复制 [`server/.env.example`](server/.env.example) 为 `server/.env`（**未创建时也可执行** `docker compose down/up`，Compose 将忽略缺失的 `server/.env`；正式环境建议仍创建并填写密钥）。
 
 **HTTPS** 请只用 [`docker-compose.https-stack.yml`](docker-compose.https-stack.yml），避免与根目录 compose 争抢宿主机 **80**（二者勿同时占用同一台机的 80）。
 
