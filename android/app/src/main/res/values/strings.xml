@@ -2,8 +2,8 @@
     <string name="app_name">文献雷达</string>
     <!-- Release 默认：与 miniprogram/utils/api.js 中 DEFAULT_BASE_URL 一致（无路径） -->
     <!-- Debug 构建见 src/debug/res/values/strings.xml（模拟器 → 宿主机 HTTP 80） -->
-    <string name="api_base_url">http://47.103.51.214</string>
+    <string name="api_base_url">https://cppteam.cn</string>
     <!-- 关于页外链：若尚未上线请替换为实际 URL -->
-    <string name="url_privacy_policy">http://47.103.51.214/privacy</string>
-    <string name="url_terms">http://47.103.51.214/terms</string>
+    <string name="url_privacy_policy">https://cppteam.cn/privacy</string>
+    <string name="url_terms">https://cppteam.cn/terms</string>
 </resources>
