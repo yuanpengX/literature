@@ -10,6 +10,7 @@ import com.literatureradar.app.data.local.AppDatabase
 import com.literatureradar.app.data.llm.LlmClient
 import com.literatureradar.app.data.llm.LlmSecureStore
 import com.literatureradar.app.prefs.AppPrefs
+import com.literatureradar.app.util.FeedTimeoutInterceptor
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -91,6 +92,7 @@ object ServiceLocator {
         val client = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
+            .addInterceptor(FeedTimeoutInterceptor())
             .addInterceptor { chain ->
                 val req = chain.request().newBuilder()
                     .header("X-User-Id", UserIdProvider.get(appContext))

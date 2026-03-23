@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -32,14 +33,7 @@ def _normalize_llm_base(url: str) -> str:
     return u
 
 
-def _call_llm_blurbs(
-    base_url: str,
-    api_key: str,
-    model: str,
-    papers: list[Paper],
-) -> dict[int, str]:
-    if not papers:
-        return {}
+def _build_llm_blurbs_user_prompt(papers: list[Paper]) -> str:
     lines = [
         "请为下列每篇论文各写一段「简体中文」介绍，严格基于标题与摘要、不要编造。要求：",
         "① 必须使用简体中文（专有名词可保留英文）；禁止整段只用英文。",
@@ -56,7 +50,18 @@ def _call_llm_blurbs(
             lines.append("摘要：（暂无）请仅依据标题写客观简短介绍，勿编造技术细节。")
         lines.append("")
     lines.append('仅输出 JSON：{"items":[{"paper_id":1,"blurb":"..."},...]}')
-    user_prompt = "\n".join(lines)
+    return "\n".join(lines)
+
+
+def _post_llm_blurbs_raw(
+    base_url: str,
+    api_key: str,
+    model: str,
+    papers: list[Paper],
+    *,
+    temperature: float,
+) -> str:
+    user_prompt = _build_llm_blurbs_user_prompt(papers)
     root = _normalize_llm_base(base_url)
     url = f"{root}/chat/completions"
     payload = {
@@ -68,7 +73,7 @@ def _call_llm_blurbs(
             },
             {"role": "user", "content": user_prompt},
         ],
-        "temperature": 0.2,
+        "temperature": float(temperature),
     }
     headers = {"Authorization": f"Bearer {api_key.strip()}", "Content-Type": "application/json"}
     timeout = max(30.0, float(settings.feed_llm_http_timeout))
@@ -78,21 +83,23 @@ def _call_llm_blurbs(
         data = r.json()
     choices = data.get("choices") or []
     if not choices:
-        return {}
+        return ""
     msg = choices[0].get("message") or {}
-    text = (msg.get("content") or "").strip()
+    return (msg.get("content") or "").strip()
+
+
+def _parse_llm_blurbs_json_content(text: str, valid: set[int]) -> dict[int, str]:
     t = text
     m = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", t)
     if m:
         t = m.group(1)
     s, e = t.find("{"), t.rfind("}")
     if s < 0 or e <= s:
-        return {}
+        raise json.JSONDecodeError("no JSON object", text, 0)
     obj = json.loads(t[s : e + 1])
     items = obj.get("items")
     if not isinstance(items, list):
         return {}
-    valid = {p.id for p in papers}
     out: dict[int, str] = {}
     for it in items:
         if not isinstance(it, dict):
@@ -109,6 +116,71 @@ def _call_llm_blurbs(
         if b:
             out[pid] = b
     return out
+
+
+def _call_llm_blurbs(
+    base_url: str,
+    api_key: str,
+    model: str,
+    papers: list[Paper],
+) -> dict[int, str]:
+    """调用用户 LLM；JSON 解析失败或缺项时有限次重试（降温 / 缩小批次）。"""
+    if not papers:
+        return {}
+    want: set[int] = {p.id for p in papers}
+    by_id = {p.id: p for p in papers}
+    accumulated: dict[int, str] = {}
+    missing_ids = [pid for pid in want]
+    temperature = 0.2
+
+    for attempt in range(4):
+        work = [by_id[i] for i in missing_ids if i in by_id]
+        if not work:
+            break
+        if attempt >= 2 and len(work) > 6:
+            work = work[:6]
+        valid = {p.id for p in work}
+        try:
+            raw_text = _post_llm_blurbs_raw(
+                base_url, api_key, model, work, temperature=temperature
+            )
+            got = _parse_llm_blurbs_json_content(raw_text, valid)
+        except json.JSONDecodeError as e:
+            logger.warning(
+                "feed_blurbs json decode attempt=%s papers=%s err=%s",
+                attempt,
+                len(work),
+                e,
+            )
+            temperature = max(0.05, temperature - 0.05)
+            continue
+        except Exception as e:
+            logger.warning(
+                "feed_blurbs llm http attempt=%s papers=%s err=%s",
+                attempt,
+                len(work),
+                e,
+                exc_info=True,
+            )
+            temperature = max(0.05, temperature - 0.05)
+            continue
+
+        accumulated.update(got)
+        if attempt == 0 and len(got) < len(work):
+            logger.warning(
+                "feed_blurbs partial llm missing=%s wanted=%s",
+                len(work) - len(got),
+                len(work),
+            )
+        missing_ids = [i for i in want if i not in accumulated]
+        if not missing_ids:
+            break
+        temperature = max(0.05, temperature - 0.05)
+
+    still = want - set(accumulated.keys())
+    if still:
+        logger.warning("feed_blurbs still_missing count=%s", len(still))
+    return accumulated
 
 
 def load_blurbs_for_papers(db: Session, user_id: str, paper_ids: list[int]) -> dict[int, str]:
@@ -168,10 +240,12 @@ def collect_feed_items_with_blurbs(
     *,
     abstract_enrich_enabled: bool,
     max_scan_multiplier: int,
-) -> tuple[list, int]:
+    wall_deadline_monotonic: float | None = None,
+) -> tuple[list, int, bool]:
     """
     从 ordered 中自 offset 起顺序扫描，同步补全 LLM 摘要，直到凑满 limit 条均有非空 feed_blurb，
-    或超出扫描窗口/候选耗尽。返回 (items, next_index)。
+    或超出扫描窗口/候选耗尽/墙钟超时。返回 (items, next_index, blurbs_generation_incomplete)。
+    incomplete 仅在为凑满 limit 且因墙钟提前退出时为 True。
     """
     out: list = []
     idx = max(0, int(offset))
@@ -180,7 +254,11 @@ def collect_feed_items_with_blurbs(
 
     sync_cap = max(BATCH_MAX, min(int(settings.feed_llm_blurb_sync_max), _SYNC_BLURB_CAP))
 
+    hit_wall = False
     while len(out) < limit and idx < max_scan:
+        if wall_deadline_monotonic is not None and time.monotonic() >= wall_deadline_monotonic:
+            hit_wall = True
+            break
         # 首屏首批拉大 batch，减少 LLM 往返（每日精选为单次调用，Feed 原先每批 10 篇易超时）
         if not out:
             chunk = min(sync_cap, len(ordered) - idx, max(limit, BATCH_MAX))
@@ -210,7 +288,8 @@ def collect_feed_items_with_blurbs(
             break
         idx += len(batch)
 
-    return out, idx
+    incomplete = bool(hit_wall and len(out) < limit)
+    return out, idx, incomplete
 
 
 def merge_blurbs_into_feed_items(
@@ -303,6 +382,88 @@ def generate_missing_blurbs_background(user_id: str, paper_ids: list[int]) -> No
         generate_missing_blurbs_for_user(db, user_id, paper_ids, max_papers=BATCH_MAX)
     except Exception:
         logger.exception("feed_blurbs background user=%s", user_id)
+        db.rollback()
+    finally:
+        db.close()
+
+
+def feed_blurbs_continue_after_index(
+    user_id: str,
+    ordered_ids: list[int],
+    start_idx: int,
+) -> None:
+    """墙钟超时后从 ordered 的 start_idx 起继续补全 blurb（独立 Session）。"""
+    from app.database import SessionLocal
+
+    if user_id in ("", "anonymous"):
+        return
+    if start_idx < 0 or start_idx >= len(ordered_ids):
+        return
+    ids = [int(x) for x in ordered_ids[start_idx : start_idx + 300]]
+    if not ids:
+        return
+    db = SessionLocal()
+    try:
+        ensure_blurbs_for_user_papers(
+            db,
+            user_id,
+            ids,
+            max_rounds=36,
+            batch_size=BATCH_MAX,
+        )
+    except Exception:
+        logger.exception("feed_blurbs continue_after_index user=%s", user_id[:24])
+        db.rollback()
+    finally:
+        db.close()
+
+
+def prewarm_feed_blurbs_for_user_background(user_id: str) -> None:
+    """合并订阅候选 Top N 预热 LLM 摘要，减少 Feed 首屏冷启动。"""
+    from app.database import SessionLocal
+    from app.services.recommend import papers_to_feed_items
+    from app.services.subscription_candidates import (
+        filter_papers_by_user_subscriptions,
+        merge_subscription_candidate_papers,
+    )
+
+    if user_id in ("", "anonymous"):
+        return
+    db = SessionLocal()
+    try:
+        user = db.get(UserProfile, user_id)
+        if user is None:
+            return
+        if (
+            not (user.llm_api_key or "").strip()
+            or not (user.llm_base_url or "").strip()
+            or not (user.llm_model or "").strip()
+        ):
+            return
+        merged = merge_subscription_candidate_papers(
+            db,
+            max_total=settings.feed_merge_max_total,
+            per_channel_limit=settings.feed_merge_per_channel,
+        )
+        filtered = filter_papers_by_user_subscriptions(
+            merged,
+            user,
+            strict=settings.feed_strict_subscription_filter,
+        )
+        if not filtered:
+            return
+        ordered = papers_to_feed_items(filtered, user, "for_you")
+        n = max(1, int(settings.feed_prewarm_top_n))
+        ids = [p.id for p in ordered[:n]]
+        ensure_blurbs_for_user_papers(
+            db,
+            user_id,
+            ids,
+            max_rounds=28,
+            batch_size=BATCH_MAX,
+        )
+    except Exception:
+        logger.exception("feed_blurbs prewarm user=%s", user_id[:24])
         db.rollback()
     finally:
         db.close()

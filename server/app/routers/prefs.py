@@ -1,9 +1,10 @@
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.deps import current_user_id, get_db
+from app.services.feed_blurbs import prewarm_feed_blurbs_for_user_background
 from app.models import UserProfile
 from app.schemas import PreferencesUpdate, UserLlmCredentials
 from sqlalchemy.orm import Session
@@ -38,6 +39,7 @@ def put_preferences(
 def put_llm_credentials(
     user_id: Annotated[str, Depends(current_user_id)],
     body: UserLlmCredentials,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """将 LLM 配置保存到服务器，供每日精选与 Feed 后台一句话摘要使用（请仅用于可信自建服务）。"""
@@ -52,6 +54,8 @@ def put_llm_credentials(
     u.llm_api_key = body.api_key.strip()
     u.llm_model = body.model.strip()
     db.commit()
+    if user_id != "anonymous":
+        background_tasks.add_task(prewarm_feed_blurbs_for_user_background, user_id)
     return {"ok": True}
 
 

@@ -18,6 +18,7 @@ from app.catalog.presets import (
 )
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
+from app.services.feed_blurbs import prewarm_feed_blurbs_for_user_background
 from app.services.ingest import run_ingestion_standalone, run_ingestion_standalone_for_channel
 from app.services.user_defaults import default_subscription_tuple
 from app.schemas import (
@@ -170,7 +171,6 @@ def get_subscription_fetch_now(
     ),
 ):
     """手动触发抓取；带 channel 时只更新对应频道数据源，避免下拉刷新拉全库。"""
-    _ = user_id
     raw = (channel or "").strip().lower()
     if raw and raw not in ("arxiv", "journal", "conference"):
         raise HTTPException(status_code=400, detail="channel 须为 arxiv、journal、conference 或省略")
@@ -178,6 +178,8 @@ def get_subscription_fetch_now(
         background_tasks.add_task(run_ingestion_standalone_for_channel, raw)
     else:
         background_tasks.add_task(run_ingestion_standalone)
+    if user_id != "anonymous":
+        background_tasks.add_task(prewarm_feed_blurbs_for_user_background, user_id)
     return {"ok": True}
 
 
@@ -243,6 +245,7 @@ def put_my_subscriptions(
         u.subscription_conferences_json = c_j
     db.commit()
     background_tasks.add_task(run_ingestion_standalone)
+    background_tasks.add_task(prewarm_feed_blurbs_for_user_background, user_id)
 
     return UserSubscriptionsResponse(
         keywords=_parse_keywords(u.subscription_keywords_json),

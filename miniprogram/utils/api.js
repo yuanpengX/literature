@@ -359,6 +359,8 @@ function request(path, method, data, retry401, reqExtra) {
   }
   const url = joinLiteratureApiUrl(base, path)
   const usedDomainAfterIpFail = !!extra.usedDomainAfterIpFail
+  const timeoutMs =
+    typeof extra.timeout === 'number' && extra.timeout > 0 ? extra.timeout : WX_REQUEST_TIMEOUT_MS
 
   const exec = () =>
     wxLiteratureRequest({
@@ -366,12 +368,13 @@ function request(path, method, data, retry401, reqExtra) {
       method: method || 'GET',
       data: data,
       header: buildAuthHeaders(),
+      timeout: timeoutMs,
     })
       .then((res) => {
         if (res.statusCode === 401 && getToken() && !retry401) {
           clearToken()
           return bootstrapWechatLogin()
-            .then(() => request(path, method, data, true))
+            .then(() => request(path, method, data, true, extra))
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
           if (usedDomainAfterIpFail) {
@@ -430,7 +433,8 @@ function getFeed(cursor, limit, sort, channel) {
   if (limit) q.limit = limit
   if (sort) q.sort = sort
   if (channel) q.channel = channel
-  return request(paths.FEED, 'GET', q)
+  /** Feed 多轮服务端 LLM，与 Caddy read_timeout（如 300s）对齐 */
+  return request(paths.FEED, 'GET', q, false, { timeout: 300000 })
 }
 
 function search(q, limit) {

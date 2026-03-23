@@ -43,6 +43,10 @@ class FeedResponse(BaseModel):
         default=False,
         description="用户是否已配置 LLM；为 true 时 Feed 仅返回已生成中文摘要的条目",
     )
+    blurbs_generation_incomplete: bool = Field(
+        default=False,
+        description="同步墙钟内未凑满 limit，后台仍在补全摘要；客户端可提示下拉刷新",
+    )
 
 
 class PreferencesUpdate(BaseModel):

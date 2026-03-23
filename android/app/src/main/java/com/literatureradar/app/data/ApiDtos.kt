@@ -9,6 +9,8 @@ data class FeedResponseJson(
     @SerialName("next_cursor") val nextCursor: String? = null,
     /** 用户是否已在服务端配置 LLM；为 false 时推荐列表不返回条目 */
     @SerialName("blurbs_llm_ready") val blurbsLlmReady: Boolean = false,
+    /** 同步窗口内未凑满 limit，后台仍在补全 blurb；宜下拉刷新 */
+    @SerialName("blurbs_generation_incomplete") val blurbsGenerationIncomplete: Boolean = false,
 )
 
 @Serializable

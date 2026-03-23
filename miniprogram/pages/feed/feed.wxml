@@ -52,6 +52,7 @@
   </view>
 
   <view wx:else class="list-wrap">
+    <view wx:if="{{blurbsGenerationIncomplete}}" class="feed-incomplete-hint">摘要生成中，下拉刷新可加载更多</view>
     <paper-card
       wx:for="{{items}}"
       wx:key="id"

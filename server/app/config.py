@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     feed_llm_http_timeout: float = 120.0  # 首屏同步生成 blurbs 时 LLM 超时（秒）；FEED_LLM_HTTP_TIMEOUT
     # 从 ordered[offset] 起最多再扫描 limit*倍数 条候选，用于跳过暂无 LLM 缓存的论文
     feed_llm_ensure_max_scan_multiplier: int = 40  # FEED_LLM_ENSURE_MAX_SCAN_MULTIPLIER
+    # Feed：单次 GET 内同步 LLM 墙钟预算（秒），超时返回已有子集并由后台续跑
+    feed_sync_wall_seconds: float = 28.0  # FEED_SYNC_WALL_SECONDS
+    # 订阅保存 / fetch-now / 同步 LLM 后对合并候选 Top N 预热 blurb
+    feed_prewarm_top_n: int = 80  # FEED_PREWARM_TOP_N
     # 每日精选（用户需主动同步 LLM 密钥到服务端；建议仅自建可信实例开启）
     daily_picks_hour: int = 6
     daily_picks_minute: int = 30

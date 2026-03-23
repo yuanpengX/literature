@@ -100,6 +100,8 @@ fun FeedScreen(
     var error by remember { mutableStateOf<String?>(null) }
     /** 与 FeedResponse.blurbs_llm_ready 一致；未配置服务端 LLM 时为 false */
     var blurbsLlmReady by remember { mutableStateOf(false) }
+    /** 服务端同步时间预算内未凑满一页，后台续跑 LLM；提示下拉刷新 */
+    var blurbsGenerationIncomplete by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var showBackTop by remember { mutableStateOf(false) }
 
@@ -131,6 +133,7 @@ fun FeedScreen(
             channel = selectedChannel.apiValue,
         )
         blurbsLlmReady = res.blurbsLlmReady
+        blurbsGenerationIncomplete = res.blurbsGenerationIncomplete
         items = res.items.filter { it.matchesChannel(selectedChannel) }
         nextCursor = res.nextCursor
         if (res.items.isNotEmpty()) {
@@ -152,6 +155,7 @@ fun FeedScreen(
                 channel = selectedChannel.apiValue,
             )
             blurbsLlmReady = blurbsLlmReady || res.blurbsLlmReady
+            blurbsGenerationIncomplete = blurbsGenerationIncomplete || res.blurbsGenerationIncomplete
             if (res.items.isEmpty()) {
                 nextCursor = res.nextCursor
                 return
@@ -172,11 +176,14 @@ fun FeedScreen(
         error = null
         nextCursor = null
         blurbsLlmReady = false
+        blurbsGenerationIncomplete = false
         withContext(Dispatchers.IO) {
             val cached = dao.listRecent(200).filter { it.matchesChannel(selectedChannel) }
+            val withBlurbOnly = cached.map { it.toPaperJson() }.filter { it.feedBlurb.isNotBlank() }
             withContext(Dispatchers.Main) {
-                items = cached.map { it.toPaperJson() }
-                loading = cached.isEmpty()
+                // 勿展示无 feedBlurb 的 Room 缓存，避免「有卡片无中文摘要」
+                items = withBlurbOnly
+                loading = withBlurbOnly.isEmpty()
             }
         }
         runCatching { refreshFirstPage() }
@@ -330,6 +337,18 @@ fun FeedScreen(
                         }
                     }
                     else -> {
+                        if (blurbsGenerationIncomplete) {
+                            item(key = "blurbs-incomplete-hint") {
+                                Text(
+                                    "摘要生成中，下拉刷新可加载更多",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 4.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
                         itemsIndexed(items, key = { _, p -> p.id }) { index, paper ->
                             PaperCard(
                                 paper = paper,

@@ -37,6 +37,7 @@ Page({
     error: '',
     showBackTop: false,
     blurbsLlmReady: false,
+    blurbsGenerationIncomplete: false,
   },
 
   onLoad() {
@@ -52,14 +53,28 @@ Page({
   onChannel(e) {
     const ch = e.currentTarget.dataset.ch
     if (ch === this.data.channel) return
-    this.setData({ channel: ch, items: [], nextCursor: null, error: '', blurbsLlmReady: false })
+    this.setData({
+      channel: ch,
+      items: [],
+      nextCursor: null,
+      error: '',
+      blurbsLlmReady: false,
+      blurbsGenerationIncomplete: false,
+    })
     this.loadFirst(true)
   },
 
   onSort(e) {
     const s = e.currentTarget.dataset.sort
     if (!s || s === this.data.sort) return
-    this.setData({ sort: s, items: [], nextCursor: null, error: '', blurbsLlmReady: false })
+    this.setData({
+      sort: s,
+      items: [],
+      nextCursor: null,
+      error: '',
+      blurbsLlmReady: false,
+      blurbsGenerationIncomplete: false,
+    })
     this.loadFirst(true)
   },
 
@@ -72,10 +87,12 @@ Page({
         .map(normalizeFeedPaper)
         .filter((p) => matchesChannel(p, this.data.channel))
       const llmReady = !!(res.blurbs_llm_ready || res.blurbsLlmReady)
+      const incomplete = !!(res.blurbs_generation_incomplete || res.blurbsGenerationIncomplete)
       this.setData({
         items,
         nextCursor: res.next_cursor || null,
         blurbsLlmReady: llmReady,
+        blurbsGenerationIncomplete: incomplete,
         loading: false,
         error: '',
       })
@@ -119,10 +136,14 @@ Page({
         .filter((p) => matchesChannel(p, this.data.channel))
       const items = this.data.items.concat(page)
       const llmReady = this.data.blurbsLlmReady || !!(res.blurbs_llm_ready || res.blurbsLlmReady)
+      const incomplete =
+        this.data.blurbsGenerationIncomplete ||
+        !!(res.blurbs_generation_incomplete || res.blurbsGenerationIncomplete)
       this.setData({
         items,
         nextCursor: res.next_cursor || null,
         blurbsLlmReady: llmReady,
+        blurbsGenerationIncomplete: incomplete,
         loadingMore: false,
       })
     } catch (err) {

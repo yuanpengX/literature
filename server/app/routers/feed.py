@@ -11,7 +11,10 @@ from app.database import SessionLocal
 from app.deps import current_user_id, get_db
 from app.models import UserProfile
 from app.schemas import FeedResponse
-from app.services.feed_blurbs import collect_feed_items_with_blurbs
+from app.services.feed_blurbs import (
+    collect_feed_items_with_blurbs,
+    feed_blurbs_continue_after_index,
+)
 from app.services.ingest import (
     maybe_fetch_arxiv_for_user_keywords,
     maybe_fetch_openalex_journal_for_user_keywords,
@@ -130,10 +133,12 @@ def get_feed(
             items=[],
             next_cursor=None,
             blurbs_llm_ready=False,
+            blurbs_generation_incomplete=False,
         )
 
     t0 = time.monotonic()
-    page, next_idx = collect_feed_items_with_blurbs(
+    wall_deadline = t0 + max(5.0, float(settings.feed_sync_wall_seconds))
+    page, next_idx, blurbs_generation_incomplete = collect_feed_items_with_blurbs(
         db,
         user_id,
         ordered,
@@ -141,6 +146,7 @@ def get_feed(
         limit,
         abstract_enrich_enabled=settings.abstract_enrich_enabled,
         max_scan_multiplier=settings.feed_llm_ensure_max_scan_multiplier,
+        wall_deadline_monotonic=wall_deadline,
     )
     elapsed = time.monotonic() - t0
     if elapsed >= 25.0:
@@ -164,8 +170,19 @@ def get_feed(
         )
     next_cursor = str(next_idx) if next_idx < len(ordered) else None
 
+    if blurbs_generation_incomplete and user_id != "anonymous":
+        ordered_ids = [p.id for p in ordered]
+        if next_idx < len(ordered_ids):
+            background_tasks.add_task(
+                feed_blurbs_continue_after_index,
+                user_id,
+                ordered_ids,
+                next_idx,
+            )
+
     return FeedResponse(
         items=page,
         next_cursor=next_cursor,
         blurbs_llm_ready=True,
+        blurbs_generation_incomplete=blurbs_generation_incomplete,
     )
