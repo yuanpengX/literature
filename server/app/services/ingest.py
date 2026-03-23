@@ -21,7 +21,7 @@ from app.models import Paper, UserProfile
 from app.database import SessionLocal
 from app.services.author_format import format_author_line
 from app.services.text_plain import (
-    _is_metadata_only_abstract,
+    _is_metadata_only_plain,
     strip_html_to_plain,
     strip_rss_boilerplate_html,
 )
@@ -269,23 +269,24 @@ def _rss_content_values(entry) -> list[str]:
     return out
 
 
+def _rss_summary_raw_candidates(entry) -> list[str]:
+    """feedparser 各字段原始 HTML，顺序：summary / description / content[*]。"""
+    out: list[str] = []
+    for key in ("summary", "description"):
+        v = entry.get(key)
+        if v:
+            out.append(str(v))
+    out.extend(_rss_content_values(entry))
+    return out
+
+
 def _rss_best_summary(entry) -> str:
-    """优先 summary/description；若为卷期元信息则尝试 content[0].value 等。"""
-    raw_sum = entry.get("summary") or entry.get("description") or ""
-    raw_sum = strip_rss_boilerplate_html(str(raw_sum) if raw_sum else "")
-    summary_plain = strip_html_to_plain(raw_sum)
-    if summary_plain and not _is_metadata_only_abstract(summary_plain):
-        return summary_plain
-    for html in _rss_content_values(entry):
-        cplain = strip_html_to_plain(strip_rss_boilerplate_html(html))
-        if cplain and not _is_metadata_only_abstract(cplain):
-            return cplain
-    if summary_plain:
-        return summary_plain
-    for html in _rss_content_values(entry):
-        cplain = strip_html_to_plain(strip_rss_boilerplate_html(html))
-        if cplain:
-            return cplain
+    """取第一条非「纯卷期/出版元信息」的摘要；ACS 等仅 TOC 行时返回空字符串。"""
+    for raw in _rss_summary_raw_candidates(entry):
+        cleaned = strip_rss_boilerplate_html(str(raw) if raw else "")
+        plain = strip_html_to_plain(cleaned)
+        if plain and not _is_metadata_only_plain(plain):
+            return plain
     return ""
 
 
