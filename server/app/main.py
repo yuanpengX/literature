@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
@@ -53,18 +54,32 @@ def configure_application_logging() -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     setattr(app_root, "_literature_logging_configured", True)
 _scheduler: BackgroundScheduler | None = None
+# 全量 ingest 可能超过 ingest_interval_hours；单飞避免并发写库，并与 APScheduler max_instances>1 配合，
+# 使重叠触发尽快空跑返回，而不会出现 “maximum number of running instances reached” 整次跳过。
+_ingest_lock = threading.Lock()
 
 
 def _ingest_job() -> None:
-    run_ingestion_standalone()
+    if not _ingest_lock.acquire(blocking=False):
+        logger.info("ingest: skipped scheduled run because a previous ingest is still in progress")
+        return
+    try:
+        run_ingestion_standalone()
+    finally:
+        _ingest_lock.release()
 
 
 def _ingest_startup_background() -> None:
     """首启全量抓取耗时长，勿阻塞 lifespan，否则 Caddy 反代在窗口期内 connection refused → 502。"""
+    if not _ingest_lock.acquire(blocking=False):
+        logger.info("ingest: skipped startup run because another ingest is already in progress")
+        return
     try:
-        _ingest_job()
+        run_ingestion_standalone()
     except Exception:
         logger.exception("startup ingestion failed")
+    finally:
+        _ingest_lock.release()
 
 def _daily_picks_job() -> None:
     db = SessionLocal()
@@ -107,6 +122,8 @@ async def lifespan(app: FastAPI):
         hours=float(settings.ingest_interval_hours),
         id="ingest",
         replace_existing=True,
+        max_instances=3,
+        coalesce=True,
     )
     _scheduler.add_job(_purge_job, "cron", hour=3, minute=10, id="purge", replace_existing=True)
     try:
