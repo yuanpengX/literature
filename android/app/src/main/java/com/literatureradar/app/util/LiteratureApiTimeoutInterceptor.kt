@@ -10,23 +10,24 @@ import java.util.concurrent.TimeUnit
 class LiteratureApiTimeoutInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val path = chain.request().url.encodedPath
-        val longReadWrite = 300L to TimeUnit.SECONDS
-        val llmSync = 120L to TimeUnit.SECONDS
+        // OkHttp Chain.withReadTimeout/WriteTimeout 第一参数为 Int（与 Java 重载一致），勿用 Long 字面量
+        val longReadWriteSec = 300
+        val llmSyncSec = 120
 
         val c =
             when {
                 path.contains("/feed") -> chain
-                    .withReadTimeout(longReadWrite.first, longReadWrite.second)
-                    .withWriteTimeout(longReadWrite.first, longReadWrite.second)
+                    .withReadTimeout(longReadWriteSec, TimeUnit.SECONDS)
+                    .withWriteTimeout(longReadWriteSec, TimeUnit.SECONDS)
                 path.contains("/users/me/llm") -> chain
-                    .withReadTimeout(llmSync.first, llmSync.second)
-                    .withWriteTimeout(llmSync.first, llmSync.second)
+                    .withReadTimeout(llmSyncSec, TimeUnit.SECONDS)
+                    .withWriteTimeout(llmSyncSec, TimeUnit.SECONDS)
                 path.contains("/daily-picks/me/run") -> chain
-                    .withReadTimeout(longReadWrite.first, longReadWrite.second)
-                    .withWriteTimeout(longReadWrite.first, longReadWrite.second)
+                    .withReadTimeout(longReadWriteSec, TimeUnit.SECONDS)
+                    .withWriteTimeout(longReadWriteSec, TimeUnit.SECONDS)
                 path.contains("/subscriptions/fetch-now") -> chain
-                    .withReadTimeout(longReadWrite.first, longReadWrite.second)
-                    .withWriteTimeout(longReadWrite.first, longReadWrite.second)
+                    .withReadTimeout(longReadWriteSec, TimeUnit.SECONDS)
+                    .withWriteTimeout(longReadWriteSec, TimeUnit.SECONDS)
                 else -> chain
             }
         return c.proceed(chain.request())

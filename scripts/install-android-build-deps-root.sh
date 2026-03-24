@@ -8,8 +8,7 @@
 #   - 若 apt 报 lock：脚本会默认等待锁释放（见 wait_dpkg_unlock）；也可设置 APT_LOCK_WAIT_MAX=3600 调整上限秒数。
 #   - 若不想等待：SKIP_APT_LOCK_WAIT=1（锁仍存在时 apt 仍会失败，仅跳过轮询）。
 #   - 另一终端可看进度：systemctl status unattended-upgrades 或 ps aux | grep unattended
-#   - Gradle 仍可能峰值较高；建议在宿主机增加 swap，例如：
-#       fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+#   - 打 APK 前建议总 swap ≥2GiB；本脚本结束时会尝试执行 scripts/setup-swap-for-apk-build.sh（也可用 SKIP_SETUP_SWAP=1 跳过）。
 set -euo pipefail
 
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
@@ -80,4 +79,11 @@ apt-get install -y --no-install-recommends \
   psmisc openjdk-17-jdk-headless unzip wget
 
 echo "已安装：psmisc、openjdk-17-jdk-headless、unzip、wget。"
+
+THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${SKIP_SETUP_SWAP:-0}" != "1" && -f "$THIS_DIR/setup-swap-for-apk-build.sh" ]]; then
+  echo "配置打 APK 用 swap（若总 swap 已 ≥2GiB 会自动跳过）…" >&2
+  bash "$THIS_DIR/setup-swap-for-apk-build.sh" || echo "swap 配置未完全成功，可稍后手动：sudo bash scripts/setup-swap-for-apk-build.sh" >&2
+fi
+
 echo "下一步：在项目根目录执行  bash scripts/build-apk-headless.sh"

@@ -3,13 +3,24 @@
 # 系统依赖（JDK 等）请先执行（一次即可）：sudo bash scripts/install-android-build-deps-root.sh
 # 可用 root 或普通用户运行；root 时默认 ANDROID_HOME=/root/android-sdk。
 #
-# 目标环境：2 核 2G 内存 VPS。与 android/gradle.properties（约 896M Gradle 堆 + in-process Kotlin）一致；
-# 脚本侧：--no-daemon、默认 --max-workers=1，减少峰值内存。
-# 若仍 OOM：先加 swap（建议 ≥2G），并停掉 Docker 等占内存服务后再打包。
-# 机器更强时可设 GRADLE_LOW_MEM=0 允许 Gradle 使用 gradle.properties 里的 workers.max（仍勿在 2G 上并行过大）。
+# 目标环境：约 4G 内存 VPS，构建 JVM 预算约 ≤2GiB（见 android/gradle.properties）+ 建议系统总 swap ≥2GiB。
+# 脚本侧：--no-daemon、默认 --max-workers=1；首次部署请 sudo bash scripts/setup-swap-for-apk-build.sh（install-android-build-deps-root 也会调用）。
+# 若仍 OOM：停掉 Docker 等占内存服务后再打包，或略增大 swap / 按 gradle.properties 注释微调 Metaspace。
+# 机器更强时可设 GRADLE_LOW_MEM=0；swap 不足时可 SKIP_SWAP_CHECK=1 强行继续（不推荐）。
 set -euo pipefail
 
 GRADLE_LOW_MEM="${GRADLE_LOW_MEM:-1}"
+MIN_SWAP_KB=$((2048 * 1024)) # 2 GiB
+
+if [[ "${SKIP_SWAP_CHECK:-0}" != "1" ]]; then
+  swap_kb="$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  if (( swap_kb < MIN_SWAP_KB )); then
+    echo "当前 SwapTotal 约 $((swap_kb / 1024)) MiB，低于建议的 2 GiB，Gradle 打 APK 容易内存不足被系统杀进程。" >&2
+    echo "请执行（root）：sudo bash scripts/setup-swap-for-apk-build.sh" >&2
+    echo "若已手动配置足够 swap 仍误报：SKIP_SWAP_CHECK=1 bash $0" >&2
+    exit 1
+  fi
+fi
 
 if ! command -v java >/dev/null 2>&1; then
   echo "未找到 java。请先执行：sudo bash scripts/install-android-build-deps-root.sh" >&2
@@ -56,7 +67,7 @@ gradlew_args=(--no-daemon)
 if [[ "$GRADLE_LOW_MEM" == "1" ]]; then
   gradlew_args+=(--max-workers=1)
 fi
-# JVM/并行策略以 android/gradle.properties 为准（2 核 2G  profile）
+# JVM/并行策略以 android/gradle.properties 为准（约 4G 机 / 2G 构建预算 profile）
 ./gradlew "${gradlew_args[@]}" assembleRelease
 
 # Gradle 会将 APK 同步到 android/apk/（浅路径）；否则回退默认输出目录

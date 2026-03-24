@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 在 Linux 上：编译并直接安装到已连接的手机 / 模拟器（无需手动拷 APK）。
 #
-# 双核 / 约 4G：与 android/gradle.properties、scripts/build-apk-headless.sh 一致，默认
+# 约 4G 内存 / 2G 构建预算：与 android/gradle.properties、build-apk-headless.sh 一致，默认
 # --no-daemon --max-workers=1。更强机器可 GRADLE_LOW_MEM=0。
 #
 # 前置：
