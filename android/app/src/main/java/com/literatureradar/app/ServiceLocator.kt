@@ -71,21 +71,8 @@ object ServiceLocator {
 
     fun rebuildNetworkIfNeeded() {
         if (!::appContext.isInitialized) return
-        val defaultBase = appContext.getString(R.string.api_base_url)
-        val fromPrefs = AppPrefs.getApiBaseUrl(appContext).trim()
-        val raw = (fromPrefs.ifBlank { defaultBase }).trim()
-        var domainNorm = AppPrefs.normalizeApiBaseUrl(raw)
-        if (domainNorm.isEmpty()) {
-            domainNorm = AppPrefs.normalizeApiBaseUrl(defaultBase)
-        }
-        val normalized =
-            if (AppPrefs.isUseServerIpBase(appContext)) {
-                val ipRaw = AppPrefs.getCachedHttpIpBase(appContext).trim()
-                val ipNorm = AppPrefs.normalizeApiBaseUrl(ipRaw)
-                if (ipNorm.isNotEmpty()) ipNorm else domainNorm
-            } else {
-                domainNorm
-            }
+        val normalized = AppPrefs.resolveLiteratureApiBase(appContext)
+        if (normalized.isEmpty()) return
         val base = normalized.trimEnd('/') + "/"
         val cur = network
         if (cur != null && cur.baseUrl == base) return

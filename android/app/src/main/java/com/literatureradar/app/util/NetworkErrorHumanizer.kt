@@ -62,7 +62,7 @@ object NetworkErrorHumanizer {
             t.contains("Broken pipe", ignoreCase = true) ||
             t.contains("ECONNRESET", ignoreCase = true)
         ) {
-            return "连接被对端重置（常见于服务器重启、HTTPS 栈抖动或运营商掐断）。请稍后重试；若频繁出现请关闭「直连 IP」、仅用域名 HTTPS，并确认非整点大规模抓取占满服务器。"
+            return "连接被对端重置（常见于服务器重启、链路抖动或中间设备掐断）。请稍后重试；设置里确认「当前生效文献 API」为 HTTPS 域名且已关闭「直连」。若仍频繁出现，在电脑执行 curl -v https://你的域名/health 对照服务端与 Caddy 日志。"
         }
         return null
     }

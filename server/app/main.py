@@ -9,6 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from app.database import (
     Base,
@@ -151,6 +153,29 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Literature Radar API", version="0.1.0", lifespan=lifespan)
 
+
+class LiteratureAccessLogMiddleware(BaseHTTPMiddleware):
+    """经 Caddy 反代时从 X-Forwarded-For 取客户端；用于与 docker logs 对照「手机是否打到 API」。"""
+
+    async def dispatch(self, request: Request, call_next):
+        ff = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        ua = (request.headers.get("user-agent") or "")[:200].replace("\n", " ")
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            logger.info(
+                "access %s %s %s ff=%s ua=%s",
+                status_code,
+                request.method,
+                request.url.path,
+                ff or "-",
+                ua or "-",
+            )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -158,6 +183,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(LiteratureAccessLogMiddleware)
 
 api_prefix = "/api/v1"
 app.include_router(auth_wechat.router, prefix=api_prefix)

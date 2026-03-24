@@ -367,6 +367,19 @@ fun FeedScreen(
                         }
                     }
                     else -> {
+                        // 有 Room 缓存时列表非空；此前失败只写了 error 但不展示，下拉刷新会像「没反应」
+                        if (error != null) {
+                            item(key = "refresh-error-banner") {
+                                Text(
+                                    text = error!!,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
                         if (blurbsGenerationIncomplete) {
                             item(key = "blurbs-incomplete-hint") {
                                 Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {

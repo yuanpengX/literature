@@ -2,6 +2,11 @@
 # 默认见 deploy/https.defaults.env；可被 deploy/https.env 覆盖
 
 {$LITERATURE_DOMAIN}, www.{$LITERATURE_DOMAIN} {
+	# 打到 stdout，便于 docker logs <caddy容器> 判断 TLS/443 是否收到请求（与 API 容器日志对照）
+	log {
+		output stdout
+		format console
+	}
 	tls {$CADDY_TLS_CERT} {$CADDY_TLS_KEY}
 	encode gzip zstd
 	# Feed 首屏可能多轮用户 LLM + 摘要补全，默认 60s 易被掐断

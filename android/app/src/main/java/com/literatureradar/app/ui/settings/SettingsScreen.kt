@@ -76,7 +76,11 @@ fun SettingsScreen(
     var literatureApiDomain by remember { mutableStateOf(AppPrefs.getApiBaseUrl(ctx)) }
     var useServerIp by remember { mutableStateOf(AppPrefs.isUseServerIpBase(ctx)) }
     var apiBaseHint by remember { mutableStateOf<String?>(null) }
+    /** 在保存 / 切换直连后递增，用于刷新「当前生效」展示 */
+    var apiPrefsEpoch by remember { mutableStateOf(0) }
     val scope = remember { CoroutineScope(Dispatchers.Main) }
+    val effectiveLiteratureRoot =
+        remember(apiPrefsEpoch, useServerIp) { AppPrefs.resolveLiteratureApiBase(ctx) }
 
     val preset = LlmPresets.byId(providerId)
 
@@ -98,9 +102,14 @@ fun SettingsScreen(
         ) {
             Text("文献 API 根地址", style = MaterialTheme.typography.titleMedium)
             Text(
-                "默认走 HTTPS 域名（与 strings.xml 一致，可下方覆盖）。生产以 HTTPS 为准。开启「直连」后使用 server/.env 的 LITERATURE_HTTP_IP_BASE（建议 https://，须配置合法域名）。",
+                "默认走 HTTPS 域名（与 strings.xml 一致，可下方覆盖）。生产以 HTTPS 为准。开启「直连」后使用 server/.env 的 LITERATURE_HTTP_IP_BASE（建议与主域名一致；用裸 IP + HTTPS 易因证书名不匹配被掐断）。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "当前生效文献 API：$effectiveLiteratureRoot",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
             )
             OutlinedTextField(
                 value = literatureApiDomain,
@@ -116,6 +125,7 @@ fun SettingsScreen(
                     AppPrefs.setApiBaseUrl(ctx, literatureApiDomain.trim())
                     literatureApiDomain = AppPrefs.getApiBaseUrl(ctx)
                     ServiceLocator.rebuildNetworkIfNeeded()
+                    apiPrefsEpoch++
                     apiBaseHint = "已保存域名根地址"
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -138,10 +148,12 @@ fun SettingsScreen(
                     checked = useServerIp,
                     onCheckedChange = { on ->
                         if (!on) {
+                            AppPrefs.setCachedHttpIpBase(ctx, "")
                             AppPrefs.setUseServerIpBase(ctx, false)
                             useServerIp = false
                             ServiceLocator.rebuildNetworkIfNeeded()
-                            apiBaseHint = "已切回域名模式"
+                            apiPrefsEpoch++
+                            apiBaseHint = "已切回域名模式（已清除缓存的直连地址）"
                             return@Switch
                         }
                         scope.launch {
@@ -165,6 +177,7 @@ fun SettingsScreen(
                             AppPrefs.setUseServerIpBase(ctx, true)
                             useServerIp = true
                             ServiceLocator.rebuildNetworkIfNeeded()
+                            apiPrefsEpoch++
                             apiBaseHint = "已启用直连：$ip"
                         }
                     },
@@ -191,6 +204,7 @@ fun SettingsScreen(
                             }
                             AppPrefs.setCachedHttpIpBase(ctx, ip)
                             ServiceLocator.rebuildNetworkIfNeeded()
+                            apiPrefsEpoch++
                             apiBaseHint = "已更新：$ip"
                         }
                     },
