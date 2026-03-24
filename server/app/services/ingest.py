@@ -129,11 +129,35 @@ def fetch_and_upsert_arxiv_search(db: Session, search_query: str, max_results: i
         "max_results": cap,
     }
     url = "https://export.arxiv.org/api/query"
-    with httpx.Client(timeout=60.0) as client:
-        r = client.get(url, params=params)
-        r.raise_for_status()
-        root = ET.fromstring(r.text)
-    return _upsert_arxiv_atom_entries(db, root)
+    t = max(30.0, float(settings.arxiv_http_timeout))
+    timeout = httpx.Timeout(connect=t, read=max(t, 90.0), write=60.0, pool=15.0)
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                r = client.get(url, params=params)
+                r.raise_for_status()
+                root = ET.fromstring(r.text)
+            return _upsert_arxiv_atom_entries(db, root)
+        except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError, httpx.RemoteProtocolError) as e:
+            last_err = e
+            logger.warning(
+                "arxiv api query failed attempt=%s/3 err=%s",
+                attempt + 1,
+                e,
+            )
+            if attempt < 2:
+                time.sleep(2.0 * (attempt + 1))
+    logger.error("arxiv api query exhausted retries: %s", last_err)
+    return 0
+
+
+def _ingest_try_int(label: str, fn) -> int:
+    try:
+        return int(fn())
+    except Exception:
+        logger.exception("ingest step failed label=%s", label)
+        return 0
 
 
 def fetch_and_upsert_arxiv(db: Session) -> int:
@@ -502,20 +526,31 @@ def run_ingestion_standalone_for_channel(channel: str | None = None) -> None:
 
 
 def run_all_ingestion(db: Session) -> dict[str, int]:
-    out: dict[str, int] = {"arxiv_new": fetch_and_upsert_arxiv(db)}
+    out: dict[str, int] = {
+        "arxiv_new": _ingest_try_int("arxiv_global", lambda: fetch_and_upsert_arxiv(db)),
+    }
     for raw in settings.rss_feeds.split(","):
         u = raw.strip()
         if u:
             key = f"rss_new:{u[:30]}"
-            out[key] = fetch_and_upsert_rss(db, u)
+            out[key] = _ingest_try_int(key, lambda url=u: fetch_and_upsert_rss(db, url))
     for sub_url in collect_subscription_rss_urls(db):
         key = f"rss_sub:{sub_url[:40]}"
-        out[key] = fetch_and_upsert_rss(db, sub_url)
-    out["openalex_new"] = fetch_and_upsert_openalex(db)
-    out["openalex_conference_new"] = fetch_and_upsert_openalex_conference_works(db)
+        out[key] = _ingest_try_int(key, lambda u=sub_url: fetch_and_upsert_rss(db, u))
+    out["openalex_new"] = _ingest_try_int("openalex", lambda: fetch_and_upsert_openalex(db))
+    out["openalex_conference_new"] = _ingest_try_int(
+        "openalex_conference",
+        lambda: fetch_and_upsert_openalex_conference_works(db),
+    )
     src_ids = collect_subscription_openalex_source_ids(db)
-    out["openalex_subscription_sources"] = fetch_and_upsert_openalex_for_source_ids(db, src_ids)
-    out["arxiv_citations_updated"] = enrich_arxiv_citations(db)
+    out["openalex_subscription_sources"] = _ingest_try_int(
+        "openalex_subscription_sources",
+        lambda: fetch_and_upsert_openalex_for_source_ids(db, src_ids),
+    )
+    out["arxiv_citations_updated"] = _ingest_try_int(
+        "arxiv_citations",
+        lambda: enrich_arxiv_citations(db),
+    )
     return out
 
 

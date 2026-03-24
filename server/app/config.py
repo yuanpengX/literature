@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     arxiv_keyword_max_results: int = 40  # ARXIV_KEYWORD_MAX_RESULTS
     arxiv_user_refresh_seconds: float = 600.0  # 同一用户两次关键词拉取最小间隔（秒）；ARXIV_USER_REFRESH_SECONDS
     arxiv_keyword_max_terms: int = 12  # 拼 OR 查询时最多采用几条关键词；ARXIV_KEYWORD_MAX_TERMS
+    # export.arxiv.org 跨境 TLS 握手偶发很慢；过短易 ConnectTimeout
+    arxiv_http_timeout: float = 120.0  # connect/read 下限参考；ARXIV_HTTP_TIMEOUT
     rss_feeds: str = ""  # comma-separated URLs, optional
     # OpenAlex: https://docs.openalex.org — 需可访问 api.openalex.org
     openalex_enabled: bool = False
