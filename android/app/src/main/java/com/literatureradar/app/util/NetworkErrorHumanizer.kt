@@ -57,6 +57,13 @@ object NetworkErrorHumanizer {
         if (t.contains("timeout", ignoreCase = true) || t.contains("timed out", ignoreCase = true)) {
             return "连接超时，请稍后重试或检查网络"
         }
+        if (t.contains("Connection reset", ignoreCase = true) ||
+            t.contains("reset by peer", ignoreCase = true) ||
+            t.contains("Broken pipe", ignoreCase = true) ||
+            t.contains("ECONNRESET", ignoreCase = true)
+        ) {
+            return "连接被对端重置（常见于服务器重启、HTTPS 栈抖动或运营商掐断）。请稍后重试；若频繁出现请关闭「直连 IP」、仅用域名 HTTPS，并确认非整点大规模抓取占满服务器。"
+        }
         return null
     }
 }

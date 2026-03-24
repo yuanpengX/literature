@@ -5,7 +5,12 @@ from sqlalchemy.orm import Session, sessionmaker, declarative_base
 
 from app.config import settings
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+# timeout：SQLite busy 等待秒数；ingest 长时间写库时避免 API（如 PUT /users/me/llm）因锁等待失败
+connect_args = (
+    {"check_same_thread": False, "timeout": 60.0}
+    if settings.database_url.startswith("sqlite")
+    else {}
+)
 engine = create_engine(settings.database_url, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
